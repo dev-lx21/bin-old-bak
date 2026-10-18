@@ -12,10 +12,62 @@
 #
 # ---------------------------------------------------------------------------------------
 # ---------------------------------------------------------------------------------------
-# [[ -z "$1" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return
+# [[ -z "$1" ]] && echo -e "|- ${FUNCNAME[0]} FEHLER:"\\t"1. Argument nicht angegeben!" && return 11
+# [[ -z "$2" ]] && echo -e "|- ${FUNCNAME[0]} FEHLER:"\\t"2. Argument nicht angegeben!" && return 12
+# -------------------------------------------------------------------------------------------------
+# ----- START -------------------------------------------------------------------------------------
+# ----- ENDE --------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 
 
 
+
+# -------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+function fncDEBUGstart {
+    flagFNCdebug="true"
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    echo -e "--------------------------------------------------------------------------------"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - START Debug: $txtDEBUGtitel"
+    PS4='+ ${LINENO}:'`echo -en '\\t'`
+    set -x
+}
+
+function fncDEBUGstop {
+    # -Damit fncDEBUGstop nur ausgeführt wird, wenn vorher fncDEBUGstart aufgerufen wurde.
+    [ ! "$flagFNCdebug" ] && return
+    set +x
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - ENDE Debug: $txtDEBUGtitel"
+    echo -e "--------------------------------------------------------------------------------"
+}
+
+
+
+
+
+# function check ob datei bzw prozess schon läuft, falls ja wird hier beendet:
+
+
+
+
+
+
+
+function fncClearX {
+    # -Da 'clear -x' einen Bug hat und deshalb den sichtbaren Teil der letzten
+    #  Befehle einfach löscht, werden soviele leere Zeilen ausgegeben, wie der
+    #  Bildschirm Zeilen hat.
+    # -Beim Aufruf von 'clear -x' löscht der Befehl dann diese leeren Zeilen
+    #  und die History wird nicht überschrieben.
+    typeset -i intAnzahlScreenZeilen=$(tput lines)
+    for ((iZeilen=1; iZeilen<$intAnzahlScreenZeilen; iZeilen++))
+    do
+        echo -e "$iZeilen"
+    done
+    clear -x
+}
 
 
 dateiVersionInfoNr=""
@@ -27,40 +79,40 @@ function fncAUSLESENversion {
     iaLSarrayANZAHL=${#iaLSarray[@]}
     dateiNameKomplett=${iaLSarray[0]}
     dateiVersionKomplett=${iaLSarray[0]}
-    
+
     #  foo/bar/lxDOWNLOAD_2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
-    
+
     # -Bis zum letzten Slash abschneiden:
     dateiVersionKomplett=${dateiVersionKomplett//*\//}
     #  lxDOWNLOAD_2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
-    
+
     # -Dateiname bis Unterstrich abschneiden:
     dateiVersionKomplett=${dateiVersionKomplett//`echo -e $datei`_/}
     #  2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
-    
+
     # -Unterstrich bis zum Ende abschneiden: dateiVersionInfoNr
     dateiVersionInfoNr=${dateiVersionKomplett//_*/}
     #  2.17.05-01-01
-    
+
     # -Bis zum Unterstrich abschneiden: dateiVersionKomplettTxt
     dateiVersionKomplettTxt=${dateiVersionKomplett//$dateiVersionInfoNr\_/}
     #  TODO_einbauen-dateiVersionNrTxt
-    
+
     # -Nur die Kategorie ausschneiden:
     dateiVersionInfoKategorie=${dateiVersionKomplettTxt//_*/}
     #  TODO
-    
-    # -Nur den Infotext ausschneiden: 
+
+    # -Nur den Infotext ausschneiden:
     dateiVersionInfoTxt=${dateiVersionKomplettTxt//$dateiVersionInfoKategorie\_/}
     #  einbauen-dateiVersionNrTxt
-    
+
     dateiVersionInfoNr="$dateiVersionInfoNr"
     dateiVersionInfoKategorie="$dateiVersionInfoKategorie"
     dateiVersionInfoTxt="$dateiVersionInfoTxt"
-    
-}
-[ -z $dateiVersionInfoNr ] && fncAUSLESENversion
 
+}
+[[ ! $dateiVersionInfoNr ]] && fncAUSLESENversion
+[[ -z "$datei" ]] && echo -e "[FEHLER: Variable konnte nicht gelesen werden: 'datei']" && exit 22;
 
 
 
@@ -119,7 +171,48 @@ function fncYEAR1231 {
     esac
 }
 
+function fncANZAHLzeichen {
+    # -Die Anzahl der Zeichen in $1 ermitteln und mittels echo ausgeben!
+    [ ! "$1" ] && echo -e "[Kein Argument übergegeben: fncANZAHLzeichen]" && return 10
+    echo -e "${#1}"
+}
 
+
+txtPLATZHALTER=""
+function fncECHOplatzhalter {
+    # -Die Anzahl der Zeichen in $1 ermitteln und damit eine Linie als
+    #  PLATZHALTER erstellen!
+    # -ZeichenRandUhrzeit: "|- [09:31:37] "
+    # -Maximale Gesamtzeichenanzahl:
+    #  intZZmax=intLayoutMaxSpalten-intAnzahlZeichenRandUhrzeit
+    # -Am Ende werden $1 und $txtPLATZHALTER gemeinsam ausgegeben.
+    #  --------------------------------------------------------------------------------
+    txtPLATZHALTER=""
+    txtLEERZEICHEN=""
+    typeset -i intZZmax=0
+    typeset -i intZZplatzhalter=0
+    [ ! "$1" ] && intZZplatzhalter=$intZZmax
+
+    # -WICHTIG: Der Platzhalter wird mit der maximalen Länge erstellt und in die Logdatei
+    #  geschrieben. Bei der Ausgabe in den dynamischen Statuszeilen wird die Länge kontrolliert
+    #  und ggf korrigiert. Siehe intSTATUSzeichenMAX.
+    intZZmax=$intLayoutMaxSpalten
+
+    #echo -e "${#1}"
+    # -Damit zwischen $1 und $txtPLATZHALTER genau 1 Leerzeichen ist,
+    #  wird das letzte Zeichen von $1 entsprechend ausgeschnitten und
+    #  überprüft:
+    [ "$1" ] && [ -n "${1: -1}" ] && txtLEERZEICHEN=" "
+    [ "$1" ] && intZZplatzhalter=intZZmax-${#1}-${#txtLEERZEICHEN}
+    # -Den Platzhalter mittels Schleife zusammenbauen:
+    while ( [[ $intZZplatzhalter -gt 0 ]] )
+    do
+        txtPLATZHALTER=$txtPLATZHALTER"-"
+        intZZplatzhalter=intZZplatzhalter-1
+    done
+    # -$1 und $PLATZHALTER direkt ausgeben:
+    echo -e "$1""$txtLEERZEICHEN""$txtPLATZHALTER"
+}
 
 
 
@@ -138,11 +231,19 @@ then
     fmtINVERS=""
     fmtUNTERSTRICHEN=""
     fmtRESET=""
+
+    # -Start durch Cronjob oder Nutzer:
+    flagCronStart="true"
+    txtGestartetVon="Cronjob"
 else
     fmtFETT=`tput bold`
     fmtINVERS=`tput rev`
     fmtUNTERSTRICHEN=`tput smul`
     fmtRESET=`tput sgr0`
+
+    # -Start durch Cronjob oder Nutzer:
+    flagCronStart="false"
+    txtGestartetVon="Nutzer"
 fi
 # ----- ENDE Format Parameter setzen -------------------------------------------------------------
 # -------------------------------------------------------------------------------------------------------------
@@ -153,7 +254,7 @@ fi
 # -------------------------------------------------------------------------------------------------------------
 # ----- START Standard Parameter setzen ----------------------------------------------------------
 datei=${0//*\//}
-txtTITEL="Daten und Einstellungen sichern!"
+txtTITEL="Daten und Einstellungen sichern! - START: $txtGestartetVon"
 benutzung="|- Benutzung: \\n|- '$datei [OPTIONEN]' \\n|-"
 zeitSTART=`date`
 
@@ -210,7 +311,7 @@ function fncECHOlxD {
 
 
 # -------------------------------------------------------------------------------------------------
-# ----- START Argumente aus Kommandozeile übernehmen ----------------------------------------------
+# ----- START Argumente aus Befehlszeile übernehmen ----------------------------------------------
 strg1="-"
 
 txtInfoTESTDRIVE=""
@@ -280,7 +381,7 @@ do
     fi
 
 done
-# ----- ENDE Argumente aus Kommandozeile übernehmen -----------------------------------------------
+# ----- ENDE Argumente aus Befehlszeile übernehmen -----------------------------------------------
 # -------------------------------------------------------------------------------------------------
 
 
@@ -1056,39 +1157,37 @@ function fncArrayBackup {
             fncECHOlx "|- $txtZEITSTEMPEL !! ${fmtFETT}$xAnzeige: $txtInfoTESTDRIVEfertig""Erfolgreich abgeschlossen: Quelle: $ArrayQuelleWertOriginal${fmtRESET}"
         fi
         fncECHOlx "|-"
+        #fncECHOlx "|----------"
+        fncECHOlx "|------------------------------"
+        fncECHOlx "|-"
     done
     # +++++ ENDE for-ArrayQuelle ++++++++++++++++++++++++++++++
     # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    fncECHOlx "|-"
+    #fncECHOlx "|-"
     
     
     
     
     
     
-    
+    # -Das Return verhindert die Fehlerkontrolle innerhalb der fncArrayBackup.
     return
+    #fncECHOlx "--- DEBUG: Ende vor Fehlerkontrolle ---"
     
-    
-    
-    
-
-
-
-
 
         # -Fehlerkontrolle:
         fncAnzahlVerzeichnisse
         typeset -i checkBEFEHLreturn=0
         typeset -i checkBEFEHLreturnKOMPLETT=0
+        [[ "$zielGLOBAL" == "" ]] && zielGLOBAL="$datei"
 
         if ( [[ "$strg1" != -*l* ]] && [[ "$checkBEFEHLreturnKOMPLETT" == "0" ]] )
         then
             txtZEITSTEMPEL=`fncYEAR1231 'nurZAHLEN' && echo -en " " && fncHHMMSS 'norm.mS3'`
             beep -l 350 -f 392 -D 100 --new -l 350 -f 392 -D 100 --new -l 350 -f 392 -D 100 --new -l 250 -f 311.1 -D 100 --new -l 25 -f 466.2 -D 100 --new -l 350 -f 392 -D 100 --new -l 250 -f 311.1 -D 100 --new -l 25 -f 466.2 -D 100 --new -l 700 -f 392 -D 100 &
-            echo -e "|- $txtZEITSTEMPEL !! $datei - Erfolgreich abgeschlossen: $zielGLOBAL"
-            echo -e "|- $txtZEITSTEMPEL !! $datei - Erfolgreich abgeschlossen: $zielGLOBAL" >> $dateiLOGS
-            echo -e "|- $txtZEITSTEMPEL !! $datei - Erfolgreich abgeschlossen: $zielGLOBAL" >> $dateiLOGSarchiv
+            echo -e "|- $txtZEITSTEMPEL !! $datei: Erfolgreich abgeschlossen!"
+            echo -e "|- $txtZEITSTEMPEL !! $datei: Erfolgreich abgeschlossen!" >> $dateiLOGS
+            echo -e "|- $txtZEITSTEMPEL !! $datei: Erfolgreich abgeschlossen!" >> $dateiLOGSarchiv
             echo -e "|-"
             echo -e "|-" >> $dateiLOGS
             echo -e "|-" >> $dateiLOGSarchiv
@@ -1129,7 +1228,7 @@ function fncArrayBackup {
 
         # allgemeine Cron Daten loggen:
         #txtLOGcron=" - Backup ($zielGLOBAL) erfolgreich abgeschlossen!"
-        txtLOGcron=" - Erfolgreich abgeschlossen: $zielGLOBAL"
+        txtLOGcron=" - Erfolgreich abgeschlossen!"
         echo -e $txtLOGinfo$txtLOGcron >> /aa_daten/bak/log/cronjobs.log
 
 }
@@ -1175,33 +1274,60 @@ function fncArrayBackup {
 #
 # -Aufruf um Speicherplatz bzw Größe in Byte zu ermitteln
 txtBefehlByteAufruf="du -hc --max-depth=0 "
+# ---------------------------------------------------------
 
 
+# -----------------------------------------------------------------------------
+# -Backup: /etc Konfiguration
 strTarTmpVerzeichnis="/home/$nutzer"
 flagZielParentQuellpfad="true"
+ArrayQuelle=(tar:/etc tar:/var/spool/cron/crontabs)
+ArrayZiel=(/aa_daten/bak/system/etc /aa_backup/to1000/bak/backup /aa_media/usb-disc-bak/bak/backup /aa_media/wd1_bak/bak/backup /aa_network/fritz/wd1_bak/bak/backup)
+fncArrayBackup
 
+# -----------------------------------------------------------------------------
+# -Backup: Eigene Shell Skripte
+strTarTmpVerzeichnis="/home/$nutzer"
+flagZielParentQuellpfad="true"
+ArrayQuelle=(tar:/home/$nutzer/bin tar:/home/$nutzer/bin-bak)
 ArrayZiel=(/aa_backup/to1000/bak/backup /aa_media/usb-disc-bak/bak/backup /aa_media/wd1_bak/bak/backup /aa_network/fritz/wd1_bak/bak/backup)
-ArrayQuelle=(/home/$nutzer/bin /home/$nutzer/bin-bak)
 fncArrayBackup
 
 # -----------------------------------------------------------------------------
-
-strTarTmpVerzeichnis="/home/$nutzer"
-flagZielParentQuellpfad="true"
-
-ArrayZiel=(/aa_backup/to1000/bak/backup /aa_media/usb-disc-bak/bak/backup /aa_media/wd1_bak/bak/backup 0.0.2/aa_network/fritz/wd1_bak/bak/backup)
-ArrayQuelle=(tar:/etc tar:/home/$nutzer/.config tar:/home/$nutzer/.kde tar:/home/$nutzer/.local/share/Steam tar:exclude:share/Steam:/home/$nutzer/.local tar:/home/$nutzer/.mozilla tar:/home/$nutzer/.icedove /home/$nutzer/Desktop /home/$nutzer/Dokumente/bak /home/$nutzer/Dokumente/downloads /home/$nutzer/Dokumente/knowledge /home/$nutzer/Dokumente/software /aa_daten/zz_privat /aa_daten/zz_work /aa_daten/bak /aa_daten/bilder)
-fncArrayBackup
-
-# -----------------------------------------------------------------------------
-
+# -Backup: Musik, Bilder, Videos
 strTarTmpVerzeichnis="/home/$nutzer"
 flagZielParentQuellpfad="false"
-
+ArrayQuelle=(/aa_daten/musik /aa_daten/bilder /aa_backup/to1000/daten/video /aa_backup/to1000/daten/video_dlna)
 ArrayZiel=(/aa_media/wd1_dlna/aa_daten 0.0.2/aa_network/fritz/wd1_dlna/aa_daten)
-#ArrayQuelle=(/aa_backup/to1000/daten/musik /aa_backup/to1000/daten/musik_tmp /aa_backup/to1000/daten/video /aa_backup/to1000/daten/video_dlna)
-ArrayQuelle=(/aa_daten/musik /aa_backup/to1000/daten/video /aa_backup/to1000/daten/video_dlna)
 fncArrayBackup
+
+# # -----------------------------------------------------------------------------
+# # -Backup: /home spezielle Dateien
+# strTarTmpVerzeichnis="/home/$nutzer"
+# flagZielParentQuellpfad="true"
+# ArrayZiel=(/aa_backup/to1000/bak/backup /aa_media/usb-disc-bak/bak/backup /aa_media/wd1_bak/bak/backup /aa_network/fritz/wd1_bak/bak/backup)
+# ArrayQuelle=(/home/$nutzer/.bashrc /home/$nutzer/.smb)
+# fncArrayBackup
+
+
+# -----------------------------------------------------------------------------
+# -Backup: Konfiguration und Daten /home
+strTarTmpVerzeichnis="/home/$nutzer"
+flagZielParentQuellpfad="true"
+ArrayQuelle=(tar:/home/$nutzer/.config tar:/home/$nutzer/.gnupg tar:/home/$nutzer/.steam tar:/home/$nutzer/.local tar:/home/$nutzer/.mozilla tar:/home/$nutzer/.icedove /home/$nutzer/Schreibtisch /home/$nutzer/Dokumente/bak /home/$nutzer/Dokumente/downloads /home/$nutzer/Dokumente/knowledge /home/$nutzer/Dokumente/software)
+ArrayZiel=(/aa_backup/to1000/bak/backup /aa_media/wd1_bak/bak/backup 0.0.2/aa_network/fritz/wd1_bak/bak/backup)
+fncArrayBackup
+
+
+# -----------------------------------------------------------------------------
+# -Backup: Daten /aa_daten
+strTarTmpVerzeichnis="/home/$nutzer"
+flagZielParentQuellpfad="true"
+ArrayQuelle=(/aa_daten/zz_privat /aa_daten/zz_work /aa_daten/bak)
+ArrayZiel=(/aa_backup/to1000/bak/backup /aa_media/usb-disc-bak/bak/backup /aa_media/wd1_bak/bak/backup 0.0.2/aa_network/fritz/wd1_bak/bak/backup)
+fncArrayBackup
+
+
 
 
 
@@ -1213,6 +1339,71 @@ fncArrayBackup
 # ArrayZiel=(/aa_backup/to1000/bak/backup2 /aa_backup/sg250/bak/backup2 /aa_media/wd1_bak/bak/backup2 /aa_network/fritz/wd1_bak/bak/backup2)
 # ArrayQuelle=(tar:/etc tar:/home/$nutzer/.config /home/$nutzer/bin tar:/aa_daten/bak/log)
 # fncArrayBackup
+
+
+
+
+
+
+
+    # -Fehlerkontrolle:
+    fncAnzahlVerzeichnisse
+    typeset -i checkBEFEHLreturn=0
+    typeset -i checkBEFEHLreturnKOMPLETT=0
+    [[ "$zielGLOBAL" == "" ]] && zielGLOBAL="$datei"
+
+    if ( [[ "$strg1" != -*l* ]] && [[ "$checkBEFEHLreturnKOMPLETT" == "0" ]] )
+    then
+        txtZEITSTEMPEL=`fncYEAR1231 'nurZAHLEN' && echo -en " " && fncHHMMSS 'norm.mS3'`
+        beep -l 350 -f 392 -D 100 --new -l 350 -f 392 -D 100 --new -l 350 -f 392 -D 100 --new -l 250 -f 311.1 -D 100 --new -l 25 -f 466.2 -D 100 --new -l 350 -f 392 -D 100 --new -l 250 -f 311.1 -D 100 --new -l 25 -f 466.2 -D 100 --new -l 700 -f 392 -D 100 &
+        echo -e "|- $txtZEITSTEMPEL !! $datei: Erfolgreich abgeschlossen!"
+        echo -e "|- $txtZEITSTEMPEL !! $datei: Erfolgreich abgeschlossen!" >> $dateiLOGS
+        echo -e "|- $txtZEITSTEMPEL !! $datei: Erfolgreich abgeschlossen!" >> $dateiLOGSarchiv
+        #echo -e "|-"
+        #echo -e "|-" >> $dateiLOGS
+        #echo -e "|-" >> $dateiLOGSarchiv
+    elif ( [[ "$strg1" != -*l* ]] && [[ "$checkBEFEHLreturnKOMPLETT" != "0" ]] )
+    then
+        txtZEITSTEMPEL=`fncYEAR1231 'nurZAHLEN' && echo -en " " && fncHHMMSS 'norm.mS3'`
+        beep -l 300 -f 390 -D 100 --new -l 300 -f 360 -D 100 --new -l 500 -f 330 -D 100 &
+        txtBEFEHLreturn="EE FEHLER: $datei - Status: $checkBEFEHLreturnKOMPLETT"
+        txtBEFEHLreturn2="EE FEHLER: $datei - Nähere Infos: $dateiLOGS"
+        txtBEFEHLreturn3="EE FEHLER: $datei - Fehlermeldungen:"
+        txtBEFEHLreturnARCHIV="EE FEHLER: $datei - Status: $checkBEFEHLreturnKOMPLETT"
+        txtBEFEHLreturnARCHIV2="EE FEHLER: $datei - Nähere Infos: $dateiLOGSarchiv"
+        txtBEFEHLreturnARCHIV3="EE FEHLER: $datei - Fehlermeldungen:"
+        echo -e "|- $txtZEITSTEMPEL $txtBEFEHLreturn"
+        echo -e "|- $txtZEITSTEMPEL $txtBEFEHLreturn2"
+        echo -e "|- $txtZEITSTEMPEL $txtBEFEHLreturn3"
+        echo -e $txtBEFEHLstatus
+
+        echo -e "|- $txtZEITSTEMPEL $txtBEFEHLreturn" >> $dateiLOGS
+        echo -e "|- $txtZEITSTEMPEL $txtBEFEHLreturn2" >> $dateiLOGS
+        echo -e "|- $txtZEITSTEMPEL $txtBEFEHLreturn3" >> $dateiLOGS
+        echo -e $txtBEFEHLstatus >> $dateiLOGS
+
+        echo -e "|- $txtZEITSTEMPEL $txtBEFEHLreturnARCHIV" >> $dateiLOGSarchiv
+        echo -e "|- $txtZEITSTEMPEL $txtBEFEHLreturnARCHIV2" >> $dateiLOGSarchiv
+        echo -e "|- $txtZEITSTEMPEL $txtBEFEHLreturnARCHIV3" >> $dateiLOGSarchiv
+        echo -e $txtBEFEHLstatus >> $dateiLOGSarchiv
+
+        #echo -e "|-"
+        #echo -e "|-" >> $dateiLOGS
+        #echo -e "|-" >> $dateiLOGSarchiv
+    fi
+
+    fncECHOlx "|--------------------------------------------------------------------------------"\\n"|-"\\n"|-"
+
+    txtZEITSTEMPEL=`date '+%F %T:%N'`
+    txtLOGinfo="$txtZEITSTEMPEL - $datei"
+
+    # allgemeine Cron Daten loggen:
+    #txtLOGcron=" - Backup ($zielGLOBAL) erfolgreich abgeschlossen!"
+    txtLOGcron=" - Erfolgreich abgeschlossen!"
+    echo -e $txtLOGinfo$txtLOGcron >> /aa_daten/bak/log/cronjobs.log
+
+
+
 
 
 

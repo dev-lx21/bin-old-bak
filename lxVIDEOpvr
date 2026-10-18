@@ -1,0 +1,699 @@
+#!/bin/bash
+# lx-tools script von -lx-
+
+
+# -------------------------------------------------------------------------------------
+# --- mp4 in ein bestimmtes format umwandeln: -----------------------------------------
+# -------------------------------------------------------------------------------------
+#
+# -checken ob format groesser ist als HD 1280x720, falls ja muss umgewandelt werden:
+#  vcodec h264 -r $intMAXframerate, acodec libmp3lame
+#  die framerate (fps oder nur p) auf (-r) 25 setzen
+
+
+txtDATEIliste=""
+txtOPTIONENbefehl=""
+flagHILFE="false"
+flagLOGS="false"
+flagTESTDRIVE="false"
+flagRENAME="false"
+flagFFMPGausgabe="info"
+flagUNTERVERZEICHNIS="false"
+flag_aufruf_intern="false"
+
+
+
+# -------------------------------------------------------------------
+# ----- START Optionen Kontrolle ------------------------------------
+# -Falls eine der eingegebenen Stringparameter nicht mit "-" anfängt
+#  wird diese als pfad gesetzt!
+for i in "$@"
+do
+    # -Stringparameter einzeln prüfen:
+    #echo -e "--- $i ---"
+    if ( [[ "$i" != "" ]] )
+    then
+        if ( [[ "$i" == -h ]] )
+        then
+            flagHILFE="true"
+            break
+        fi
+        if ( [[ "$i" == -l ]] )
+        then
+            flagLOGS="true"
+            break
+        fi
+        if ( [[ "$i" == -t ]] )
+        then
+            flagTESTDRIVE="true"
+            txtOPTIONENbefehl=$txtOPTIONENbefehl" -t"
+        fi
+        if ( [[ "$i" == -r ]] )
+        then
+            flagRENAME="true"
+            txtOPTIONENbefehl=$txtOPTIONENbefehl" -r"
+        fi
+        if ( [[ "$i" == -v=* ]] )
+        then
+            flagFFMPGausgabe=${i//*=/}
+            txtOPTIONENbefehl=$txtOPTIONENbefehl" $i"
+        fi
+        if ( [[ "$i" == "-UVZ" ]] )
+        then
+            flagUNTERVERZEICHNIS="true"
+            flag_aufruf_intern="true"
+            #echo -e "----- UVZ INTERN TRUE -----"
+        fi
+        if ( [[ "$i" != -* ]] )
+            then
+            #echo -e "--- String fängt nicht mit "-" an! ---"
+            #echo -e "--- String ist keine Option, also Pfad! ---"
+            pfad="$i"
+        fi
+    fi
+done
+# ----- ENDE Optionen Kontrolle -------------------------------------
+# -------------------------------------------------------------------
+
+
+#pfad=$1
+#flag_update=$2
+#flag_aufruf_intern=$3
+
+
+
+# -----------------------------------------------
+# --- parameter liste beachten ------------------
+
+fmtFETT=`tput bold`
+fmtINVERS=`tput rev`
+fmtUNTERSTRICHEN=`tput smul`
+fmtRESET=`tput sgr0`
+
+zeitSTART=`date '+%F %T:%N'`
+flag_rename="false"
+
+datei=${0//*\//}
+txtTITEL="PVR Dateien in MP4 Videos umwandeln!"
+intMAXframerate=30
+
+extension=".VID"
+extension2=".AUD"
+ZIELextension=".mp4"
+#name_datei_playliste="00_alle_pls.m3u"
+#name_datei_update="00_alle_pls_update.sh"
+#echo -e "$extension"
+#suchpfad_speichern_pls=*$extension
+suchpfad=$pfad*$extension
+#echo -e "$suchpfad"
+flag_stop=0
+
+# -die Namen der Dateien zum Loggen festlegen:
+dateiLOGS="00_$datei.LOGS.txt"
+dateiLOGStmp="00_$datei.LOGS.txt.tmp"
+
+# -----------------------------------------------
+# -----------------------------------------------
+
+
+
+
+
+
+txtHR="|--------------------------------------------------------------------------------"
+txtKOPF=\
+"|--------------------------------------------------------------------------------"\\n\
+"|- $datei -| "
+
+txtKOPFlogs=$txtKOPF"Logdatei"\\n\
+"|--------------------------------------------------------------------------------"\\n\
+"|- $zeitSTART"\\n\
+"|-"
+
+txtKOPF=$txtKOPF$txtTITEL\\n\
+"|--------------------------------------------------------------------------------"\\n\
+"|- $zeitSTART"\\n\
+"|-"
+
+
+txtBENUTZUNG="|- Benutzung:\\n\
+|- '$datei [Optionen] [PFAD]'\\n\
+|- PVR Dateien (.VID und .AUD) werden zusammen geführt und in eine MP4 Video umgewandelt. Ist nur\\n\
+|- die Videodatei (.VID) vorhanden, wird diese direkt in eine MP4 Datei umgewandelt.\\n\
+|-"
+txtHILFE="|- PFAD kann eine einzelne Datei, ein Verzeichnis oder leer sein. Ist kein PFAD\\n"\
+"|- angegeben wird das aktuelle Verzeichnis benutzt. Dabei arbeitet das Skript,\\n"\
+"|- ausser bei einer einzelnen Datei, immer rekursiv. Die einzelnen Dateien werden\\n"\
+"|- überprüft und bei Bedarf in ein MP4 Video umgewandelt.\\n"\
+"|-\\n"\
+"|- Optionen:\\n"\
+"|- -h\\tDiesen Hilfetext anzeigen. Andere Optionen werden ignoriert."\\n\
+"|- -h\\tDie Logdatei aus dem aktuellen Verzeichnis anzeigen. Andere Optionen werden ignoriert."\\n\
+"|- -t\\tDie Dateien oder Ordner unter dem PFAD nur testen und die Ergebnisse anzeigen.\\n"\
+"|- -v='...'\\n"\
+"|- \\tDen Ausgabelevel von ffmpeg einstellen. Mögliche Werte:\\n"\
+"|- \\tquiet panic fatal error warning info (Standard) verbose debug trace\\n"\
+"|- -r\\tDie Rename Funktion starten. Diese prüft und korrigiert die Dateinamen falls\\n"\
+"|- \\tdiese unerlaubte Sonderzeichen enthalten.\\n"\
+"|-\\n"\
+"|- WICHTIG: Die Optionen müssen einzeln stehen d.h. sie dürfen nicht zusammen gefasst werden.\\n"\
+"|- Also '-t -r' anstatt '-tr'!\\n"\
+"|-"
+
+
+
+if ( [[ "$flag_aufruf_intern" != "true" ]] )
+then
+    # wird (fast) immer angezeigt:
+#     echo -e "|--------------------------------------------------------------------------------"
+#     echo -e "|- $datei -| $titel"
+#     echo -e "|--------------------------------------------------------------------------------"
+#     echo -e "|- "`date '+%F %T:%N'`
+#     echo -e "|-"
+    # version, GPL, autor...
+    if ( [[ "$flagLOGS" == "true" ]] )
+    then
+        cat $dateiLOGS
+        exit 0;
+    fi
+
+    echo -e $txtKOPF
+    echo -e $txtBENUTZUNG
+    if ( [[ "$flagHILFE" == "true" ]] )
+    then
+        echo -e $txtHILFE
+        exit 0;
+    fi
+fi
+
+
+# START pfad-kontrolle -----------------------------------
+# den pfad pruefen, ggf korrigieren, ggf FEHLER ausgeben!
+# -ist bei internem aufruf nicht erforderlich:
+if ( [[ "$flag_aufruf_intern" != "true" ]] )
+then
+    if ( [[ "$pfad" == "" ]] )
+    then
+        #echo -e "--- pfad-ist-leer ---"
+        # aktueller ort wird als pfad angenommen:
+        pfad=`pwd`
+        #kdialog --msgbox="Pfad: $pfad"
+    fi
+    #echo -e "--- pfad-ist-nicht-leer ---"
+    # pfad wurde uebergeben oder mittels pwd gesetzt!
+    # pfad pruefen und ggf FEHLER ausgeben:
+    if ( [[ -d "$pfad" ]] )
+    then
+        # wenn pfad auf ein existierendes Verzeichnis zeigt: kein fehler
+        # WICHTIG: den slash an den pfad haengen:
+        pfad=$pfad"/"
+        fehler=0
+    elif ( [[ -f "$pfad" ]] )
+    then
+        # wenn pfad auf eine existierende datei zeigt: kein fehler
+        #kdialog --msgbox="Pfad: $pfad"
+        fehler=0
+    else
+        fehler=1
+        kdialog --title="FEHLER" --error="FEHLER:\nDas Verzeichnis lässt sich nicht öffnen. Bitte überprüfen Sie Ihre Eingabe! Vielleicht ein Tippfehler oder ungenügende Zugriffsrechte.\n\nVerzeichnis:\n$pfad\n\n\nDas Script wird beendet."
+        exit 0;
+    fi
+fi
+# ENDE pfad-kontrolle -----------------------------------
+
+
+
+
+
+
+
+
+
+# -Wird nur beim Ersten Aufruf der Datei ausgefuehrt:
+if ( [[ "$flag_aufruf_intern" != "true" ]] )
+then
+    # script namen und zeitSTART anzeigen:
+#     echo -e "|-"
+#     echo -e "|- START: $zeitSTART"
+    #echo -e "|-************************************************************"
+    #echo -e "|-*********** convert video 2 HD script von -lx- *************"
+    #if ( [[ "$flagTESTDRIVE" != "true" ]] && [[ "$flagRENAME" == "true" ]] )
+    if ( [[ "$flagRENAME" == "true" ]] )
+    then
+        kdialog --title="lx-RENAME starten?" --warningcontinuecancel="== $datei: ===================<br><br>Das lx-RENAME Script starten?<br><br>
+        Falls die Dateinamen bzgl. Leer- und Sonderzeichen<br>
+        kontrolliert und korrigiert werden sollen, wählen<br>Sie bitte <b>Mit RENAME</b>!<br>" --continue-label="Ohne RENAME" --cancel-label="Mit RENAME"
+        flag_rename=$(echo -e "$?")
+        #echo $flag_rename
+        if [[ "$flag_rename" == "2" ]]
+        then
+            echo -e "|- INFO: Die Rename Funktion zum Korrigieren der Sonder- und Leerzeichen in Dateinamen"
+            echo -e "|-       wird gestartet."
+            echo -e "|- INFO: Arbeitsverzeichnis: $pfad"
+            echo -e "|- INFO: Bitte haben Sie etwas Geduld, denn diese Funktion ist sehr rechenintensiv. Außerdem"
+            echo -e "|-       werden auch alle Dateien in den entsprechenden Unterverzeichnissen kontrolliert."
+            # eventuelle sonder- und leerzeichen aus den dateinamen loeschen:
+            /home/lx21/bin/lxRENAME "$pfad" "false" "true"
+            echo -e "|-"
+        fi
+    fi
+fi
+
+
+
+txtbox_pfad="\n\nVerzeichnis:\n$pfad"
+if ( [ -f "$pfad" ] )
+then
+    txtbox_pfad="\n\nDatei:\n$pfad"
+fi
+
+if ( [ "$flag_update" != "true" ] )
+then
+    flag_update=false
+fi
+
+
+
+
+
+
+# -Logdateien erstellen: $dateiLOGS und $dateiLOGStmp
+# --Wird nur beim Ersten Aufruf der Datei ausgeführt!
+# --Alte bereits existierende Logdateien werden überschrieben!
+if ( [[ "$flag_aufruf_intern" != "true" ]] )
+then
+    echo -e $txtKOPFlogs > $dateiLOGS
+    echo -e "|- Zusammenfassung:" > $dateiLOGStmp
+fi
+
+
+
+
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+function fncAUSGABEstdoutUNDlogdatei () {
+    # -Erwartet einen String zum Ausgeben: $1
+    # --Ausgabe am Bildschirm
+    # --Ausgabe in die Logdatei
+    if ( [[ "$1" != "" ]] )
+    then
+        echo -e "$1"
+        echo -e "$1" >> $dateiLOGS
+    fi
+}
+
+function echolx () {
+    # -Erwartet einen String zum Ausgeben: $1
+    # --Ausgabe am Bildschirm
+    # --Ausgabe in die Logdatei
+    if ( [[ "$1" != "" ]] )
+    then
+        echo -e "$1"
+        echo -e "$1" >> $dateiLOGS
+    fi
+}
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+# ---------------------------------------------------------------------------------------
+# ----- START CheckVideoConvert
+# --- diese funktion kontrolliert die aufloesung, Framerate,...
+# --- startet bei bedarf FFMPEG
+# --- und erstellt die SICHERUNGSDATEI *.bak
+# ---------------------------------------------------------------------------------------
+function CheckVideoConvert () {
+    # ----- erwartet nur $i -----
+
+#     i_check=${i//[a-zA-Z0-9_\-\.\/]/}
+#     if ( [ -n "$i_check" ] && [ "$flag_rename" == "2" ] )
+#         then
+#         debug="Pfad: $pfad - I: $i --- vor rename aufruf ---\n"
+#         #echo $debug
+#         #kdialog --title="DEBUG: $debug" --warningcontinuecancel="$txtbox_debug1$debug$txtbox_debug2$txtbox_weiter"
+#         /home/lx21/bin/lxRENAME "$i" "false" "einzelne_datei"
+#         #echo -e "alter dateiname: $i"
+#         i=${i// /_}
+#         i=${i//[^a-zA-Z0-9_\-\.\/]/x}
+#         i=${i//_\-_YouTube/}
+#         i=${i//YouPorn_\-_/}
+#         #echo -e "neuer dateiname: $i"
+#     fi
+
+    # -Dateien mittels Extensions eindeutig benennen:
+    i_VID=${i%.*}$extension
+    i_AUD=${i%.*}$extension2
+    i_AUSGABE=${i_VID%.VID}$ZIELextension
+    # -Dateiname ohne Pfad:
+    i_Dateiname=${i//*\//}
+    # -aufloesung usw. auslesen:
+    #  mediainfo --Inform='Video;%Width%' video.mp* 
+    i_width=`mediainfo --Inform='Video;%Width%' $i`
+    i_height=`mediainfo --Inform='Video;%Height%' $i`
+    i_BitRate=`mediainfo --Inform='Video;%BitRate%' $i`
+    i_FrameRate=`mediainfo --Inform='Video;%FrameRate%' $i`
+    i_FrameRate=${i_FrameRate//\.*/}
+    #echo -e "--- aufloesung: $i_width x $i_height"
+    #echo -e "--- Bitrate: $i_BitRate - Framerate: $i_FrameRate"
+    txtBEFEHLaufloesung=""
+    txtBEFEHLframerate=""
+    
+    # ------------------------------------------------------------
+    # -Bei Bedarf die Befehlszusätze zusammenbauen:
+    # --für die Auflösung: $txtBEFEHLaufloesung
+    # --für die Framerate: $txtBEFEHLframerate
+    if ( [[ "$i_width" -gt 1280 ]] || [[ "$i_height" -gt 720 ]] )
+    then
+        # seitenverhaeltnis ermitteln und beibehalten
+        # varINT=`echo -e "(8+5)*2" | bc`
+        verhaeltnis=`echo -e "$i_width/$i_height" | bc -l`
+        max_width=1280
+        max_height=`echo -e "scale=0 ; 1280/$verhaeltnis" | bc -l`
+        max_height_check=`echo -e "scale=1 ; $max_height/2" | bc -l`
+        #echo -e "--- max_height: $max_height --- max_height_check: $max_height_check"
+        if ( [[ "$max_height_check" != *.0 ]] )
+        then
+            max_height=`echo -e "scale=0 ; $max_height+1" | bc -l`
+        fi
+        #echo -e "--- NEUE aufloesung: $max_width x $max_height"
+        aufloesung=$max_width"x"$max_height
+        txtBEFEHLaufloesung=" -s $aufloesung"
+    fi
+    if ( [[ "$i_FrameRate" -gt "$intMAXframerate" ]] )
+    then
+        txtBEFEHLframerate=" -r $intMAXframerate"
+    fi
+    
+    if ( [[ -f "$i_VID" ]] && [[ -f "$i_AUD" ]] )
+    then
+        #txtAUSGABEtmp="|- Datei: $i_Dateiname"\\n"|- Zeit: `date '+%F %T:%N'` --- ffmpeg -START-"
+        txtAUSGABEtmp="|-  +- Datei: $i_Dateiname"\\n"|-   - START ffmpeg VIDAUD2MP4 [`date '+%T'`]"
+        fncAUSGABEstdoutUNDlogdatei "$txtAUSGABEtmp"
+        function fncBEFEHL () {
+            if ( [[ "$flagTESTDRIVE" == "false" ]] )
+            then
+                actionBEFEHL="echo -e $txtBEFEHL"
+                `$actionBEFEHL`
+                stsBEFEHL=$?
+            fi
+        }
+
+        # ------------------------------------------------------------
+        # ffmpeg -f mpegvideo -i SPORT.VID -i SPORT.AUD -vcodec libx264 -acodec copy SPORT.x264.neu.mp4
+        txtBEFEHL="ffmpeg -v $flagFFMPGausgabe -f mpegvideo -i $i_VID -i $i_AUD -vcodec libx264 -b:v 1024k$txtBEFEHLframerate$txtBEFEHLaufloesung -acodec copy $i_AUSGABE"
+        
+        # -Zu lange Befehle verursachen Zeilenumbruch! Deshalb wird $txtBEFEHL
+        #  in kurze Stücker zerteilt:
+#         while ( {$txtBEFEHL:$zPOSITION:$zLAENGE} != "" )
+#         do
+#             # -Ausgabe der Teilstücke:
+#             nix=1
+#         done
+        
+        txtAUSGABEtmp="|-   - $txtBEFEHL"
+        fncAUSGABEstdoutUNDlogdatei "$txtAUSGABEtmp"
+        fncBEFEHL
+        #txtAUSGABEtmp="|- Zeit: `date '+%F %T:%N'` --- ffmpeg -ENDE- [Status:$stsBEFEHL]"
+        txtAUSGABEtmp="|-   - ENDE ffmpeg [Status:$stsBEFEHL] [`date '+%T'`]"
+        fncAUSGABEstdoutUNDlogdatei "$txtAUSGABEtmp"
+        stsBEFEHLtxt="[Status:$stsBEFEHL] ERFOLGREICH:\\t"
+        if ( [[ "$stsBEFEHL" -gt 0 ]] )
+        then
+            stsBEFEHLtxt="[Status:$stsBEFEHL] FEHLER:\\t"
+        else
+            if ( [[ "$flagTESTDRIVE" == "false" ]] )
+            then
+                nix=1
+                # -Bei Bedarf SICHERUNGSDATEI erstellen:
+                #mv $i $i".bak"
+            else
+                stsBEFEHLtxt="[Status:TESTMODUS]\\t"
+            fi
+        fi
+        if ( [[ "$txtDATEIliste" == "" ]] )
+        then
+            strAUSGABE_umbruch=""
+        else
+            strAUSGABE_umbruch="\\n"
+        fi
+        txtDATEIliste=$txtDATEIliste$strAUSGABE_umbruch"|- \ +- $stsBEFEHLtxt${i_Dateiname%.VID}.mp4"
+
+    elif ( [[ -f "$i_VID" ]] )
+    then
+        #txtAUSGABEtmp="|- Datei: $i_Dateiname"\\n"|- Zeit: `date '+%F %T:%N'` --- ffmpeg -START-"
+        txtAUSGABEtmp="|-  +- Datei: $i_Dateiname"\\n"|-   - START ffmpeg VID2MP4 [`date '+%T'`]"
+        fncAUSGABEstdoutUNDlogdatei "$txtAUSGABEtmp"
+        function fncBEFEHL () {
+            if ( [[ "$flagTESTDRIVE" == "false" ]] )
+            then
+                actionBEFEHL="echo -e $txtBEFEHL"
+                `$actionBEFEHL`
+                stsBEFEHL=$?
+            fi
+        }
+
+        # ------------------------------------------------------------
+        # ffmpeg -f mpegvideo -i SPORT.VID -i SPORT.AUD -vcodec libx264 -acodec copy SPORT.x264.neu.mp4
+        txtBEFEHL="ffmpeg -v $flagFFMPGausgabe -f mpegvideo -i $i_VID -vcodec libx264 -b:v 1024k$txtBEFEHLframerate$txtBEFEHLaufloesung -acodec copy $i_AUSGABE"
+        
+        # -Zu lange Befehle verursachen Zeilenumbruch! Deshalb wird $txtBEFEHL
+        #  in kurze Stücker zerteilt:
+#         while ( {$txtBEFEHL:$zPOSITION:$zLAENGE} != "" )
+#         do
+#             # -Ausgabe der Teilstücke:
+#             nix=1
+#         done
+        
+        txtAUSGABEtmp="|-   - $txtBEFEHL"
+        fncAUSGABEstdoutUNDlogdatei "$txtAUSGABEtmp"
+        fncBEFEHL
+        #txtAUSGABEtmp="|- Zeit: `date '+%F %T:%N'` --- ffmpeg -ENDE- [Status:$stsBEFEHL]"
+        txtAUSGABEtmp="|-   - ENDE ffmpeg [Status:$stsBEFEHL] [`date '+%T'`]"
+        fncAUSGABEstdoutUNDlogdatei "$txtAUSGABEtmp"
+        stsBEFEHLtxt="[Status:$stsBEFEHL] ERFOLGREICH:\\t"
+        if ( [[ "$stsBEFEHL" -gt 0 ]] )
+        then
+            stsBEFEHLtxt="[Status:$stsBEFEHL] FEHLER:\\t"
+        else
+            if ( [[ "$flagTESTDRIVE" == "false" ]] )
+            then
+                nix=1
+                # -Bei Bedarf SICHERUNGSDATEI erstellen:
+                #mv $i $i".bak"
+            else
+                stsBEFEHLtxt="[Status:TESTMODUS]\\t"
+            fi
+        fi
+        if ( [[ "$txtDATEIliste" == "" ]] )
+        then
+            strAUSGABE_umbruch=""
+        else
+            strAUSGABE_umbruch="\\n"
+        fi
+        txtDATEIliste=$txtDATEIliste$strAUSGABE_umbruch"|- \ +- $stsBEFEHLtxt${i_Dateiname%.VID}.mp4"
+
+    else
+        txtAUSGABEtmp="|-  +- Datei: $i_Dateiname"\\n"|-   - Keine Umwandlung erforderlich! [`date '+%T'`]"
+        fncAUSGABEstdoutUNDlogdatei "$txtAUSGABEtmp"
+    fi
+}
+# ---------------------------------------------------------------------------------------
+# ----- ENDE CheckVideoConvert
+# ---------------------------------------------------------------------------------------
+
+
+
+#echo -e "|--------------------------------------------------------------------------------"
+
+
+
+
+
+# -Leerzeile bei Bedarf einfügen:
+if ( [[ "$flag_aufruf_intern" == "true" ]] )
+then
+    strAUSGABE_deko_umbruch="|-"\\n
+else
+    strAUSGABE_deko_umbruch=""
+fi
+
+txtAUSGABEtmp=$strAUSGABE_deko_umbruch"|- -+- Verzeichnis: $pfad"
+fncAUSGABEstdoutUNDlogdatei "$txtAUSGABEtmp"
+
+
+
+
+
+i=$pfad
+
+# debug="Pfad: $pfad - I: $i\n"
+# #echo $debug
+# txtbox_debug1="--- DEBUG-Info: ----------------------------------------------\n"
+# txtbox_debug2="------------------------------------------------------------------\n"
+# txtbox_weiter="\nMöchten Sie das Skript weiter ausführen oder abbrechen?\n$0\n"
+# #kdialog --title="DEBUG: $debug" --warningcontinuecancel="$txtbox_debug1$debug$txtbox_debug2$txtbox_weiter"
+
+
+
+# SONDERFALL: pfad ist datei
+# nur moeglich wenn es kein interner aufruf ist!
+if ( [[ "$flag_aufruf_intern" != "true" ]] && [[ -f "$pfad" ]] )
+then
+    #echo -e "Pfad: $pfad --- ist datei"
+    # --- die funktion CheckVideoConvert kuemmert sich um alles ---
+    CheckVideoConvert
+fi
+
+
+
+# NORMALFALL: pfad ist verzeichnis und wird mittels suchpfad abgearbeitet
+for i in $suchpfad
+do
+    #echo -e "suchpfad: $suchpfad --- datei: $i"
+    if ( [[ -f "$i" ]] )
+        then
+        nix=$i
+        CheckVideoConvert
+    fi
+done
+
+
+
+
+
+
+
+
+
+
+
+# 
+# # -Überschrift bei Bedarf anzeigen:
+# if ( [[ "$flag_aufruf_intern" != "true" ]] )
+# then
+#     txtAUSGABEtmp="|-"\\n"|- Zusammenfassung:"
+# else
+#     txtAUSGABEtmp="|-"
+# fi
+# echo -e $txtAUSGABEtmp >> $dateiLOGS
+# #fncAUSGABEstdoutUNDlogdatei "$txtAUSGABEtmp"
+
+
+
+
+
+
+
+
+# -Daten für Zusammenfassung:
+# --Falls Dateiliste leer ist, einen entsprechenden Hinweis ausgeben:
+if ( [[ "$txtDATEIliste" == "" ]] )
+then
+    #txtDATEIliste="|-\\n|- Verzeichnis:\\t$pfad\\n|- Keine der untersuchten Dateien musste umgewandelt werden!\\n"
+    txtDATEIliste="|- -+- Verzeichnis:$pfad\\n|- \ +- Keine der untersuchten Dateien musste umgewandelt werden!"
+else
+    #txtDATEIliste="|-\\n|- Verzeichnis:\\t$pfad\\n$txtDATEIliste"
+    txtDATEIliste="|- -+- Verzeichnis:$pfad\\n$txtDATEIliste"
+fi
+# --Die Dateiliste mit den Statusmeldungen sichern:
+echo -e $txtDATEIliste >> $dateiLOGStmp
+
+
+
+
+
+# --- START schleife um unterVerzeichnisse einzubinden ---------------------
+# WICHTIG: wird nur ausgefuehrt wenn pfad wirklich ein verzeichnis ist!!!
+if ( [[ -d "$pfad" ]] )
+    then
+    nix=$i
+    for ia in $(ls --group-directories-first $pfad)
+        do
+        #echo -e "Pfad: $pfad --- Verzeichnis: $ia"
+        uvz="$pfad$ia/"
+        if ( [[ -d "$uvz" ]] )
+            then
+            #echo -e "--- >>>"
+            #echo -e "--- sprung in unterverzeichnis: $uvz - optionen: $txtOPTIONENbefehl"
+            #echo -e "---" $0 $txtOPTIONENbefehl "-UVZ" $uvz
+            $0 $txtOPTIONENbefehl "-UVZ" $uvz
+            #continue
+        fi
+    done
+fi
+# --- ENDE schleife um unterVerzeichnisse einzubinden ---------------------
+
+
+
+
+
+
+
+# -Falls Skript in UVZ lief, gibt es eine $dateiLOGStmp!
+# --$dateiLOGStmp wird ausgelesen: $txtDATEIliste als Zusammenfassung anzeigen
+#   und in der normalen Logdatei mittels fncAUSGABEstdoutUNDlogdatei speichern!
+txtDATEIliste=""
+txtDATEIlisteUVZ=""
+strAUSGABE_umbruch="\\n"
+if ( [[ "$flag_aufruf_intern" != "true" ]] && [[ -f "$dateiLOGStmp" ]] )
+then
+    nix=1
+    while read txtDATEIlisteTMP
+    do
+        if ( [[ "$txtDATEIlisteUVZ" == "" ]] )
+        then
+            txtDATEIlisteUVZ=$txtDATEIlisteTMP
+            continue
+        fi
+        txtDATEIlisteUVZ=$txtDATEIlisteUVZ\\n$txtDATEIlisteTMP
+    done < $dateiLOGStmp
+    txtDATEIliste=$txtDATEIlisteUVZ
+    rm $dateiLOGStmp
+else
+    txtDATEIliste="|- Keine Zusammenfassung gefunden. Bitte überprüfen Sie die Rechtevergabe"\\n"|- für das gewählte Verzeichnis und für dieses Skript!"
+fi
+
+
+
+
+
+zeit_ende=`date '+%F %T:%N'`
+if ( [[ "$flag_aufruf_intern" != "true" ]] )
+then
+    fncAUSGABEstdoutUNDlogdatei "|-"
+    fncAUSGABEstdoutUNDlogdatei "$txtDATEIliste"
+    fncAUSGABEstdoutUNDlogdatei "|-"
+    
+    beep -l 200 -f 400 -r 2 -D 100 --new -l 600 -f 600 -D 100
+    kdialog --title="INFO" --msgbox="Das Skript\n$0\nwurde erfolgreich ausgeführt!\n$txtbox_pfad\n\n\n" &
+
+    fncAUSGABEstdoutUNDlogdatei "|------------------------------------------------------------"
+    fncAUSGABEstdoutUNDlogdatei "|- ENDE     : normal"
+    fncAUSGABEstdoutUNDlogdatei "|- Gestartet: $zeitSTART"
+    fncAUSGABEstdoutUNDlogdatei "|- Beendet  : $zeit_ende"
+    fncAUSGABEstdoutUNDlogdatei "|------------------------------------------------------------"
+fi
+
+
+exit 0;
+
+
+
+
+
+
+
+
+
+
+
+
+
+

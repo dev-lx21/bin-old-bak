@@ -5,17 +5,21 @@
 strBefehlName="yt-dlp"
 strBefehlKonfigDatei=~/.config/youtube-dl/config
 
+
 #[[ -f "$strBefehlKonfigDatei" ]] && echo -e "--- DEBUG Datei vorhanden: $strBefehlKonfigDatei"
 #exit 0;
 
 # ---------------------------------------------------------------------------------------
 # ---------------------------------------------------------------------------------------
 # ----- ToDo:
-# -Max Anzahl Downloads pro Verzeichnis
 # -System ausschalten prüfen, bei egal welcher Taste muss das Ausschalten abgebrochen werden
 # -Video Info bei einzelnen URLs
+# -Video Suchfunktion: yt-dlp ytsearch2:"Above & Beyond - Thing Called Love"
 #
 # ----- DONE:
+# -Youtube Channel werden jetzt mittels @ gekennzeichnet: https://www.youtube.com/@channelname/videos
+# -Max Anzahl Downloads pro Verzeichnis: intAnzahlVideosMax
+# -Channel als Verzeichnis nutzen
 # -Max Anzahl Zeichen für Playlist Info
 # -Stats Infos nur innerhalb der 3 Stats Zeilen (und nicht in den Menü Zeilen)
 # -URL Datei löschen, danach FAV Aufruf, danach Möglichkeit URLs zu bearbeiten
@@ -23,17 +27,24 @@ strBefehlKonfigDatei=~/.config/youtube-dl/config
 # -Auswahl Möglichkeit: Playlist Aufruf oder Playlist-Items Aufruf
 #
 # ----- Bugs:
+# -Max Anzahl Downloads funktioniert nur beim ersten Verzeichnis
+# -Anzahl der Instanzen/Prozesse begrenzen:
+# --wird ffmpeg als Downloader genutzt, laufen zu viele Prozesse: von Anfang an 3 Prozesse!!!
+#   --hls-prefer-native macht das besser und kann resume!
+# --da der ActionBefehl im Hintergrund läuft wird zu früh ein neuer Prozess gestartet (z.Bsp.
+#   während ffmpeg noch läuft) und dann laufen viel zu viele Prozesse!!!
 # -archiv bei Force
 #
 # ---------------------------------------------------------------------------------------
 # ---------------------------------------------------------------------------------------
-# [[ -z "$1" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return
+# [[ -z "$1" ]] && echo -e "|- ${FUNCNAME[0]} FEHLER:"\\t"1. Argument nicht angegeben!" && return 11
+# [[ -z "$2" ]] && echo -e "|- ${FUNCNAME[0]} FEHLER:"\\t"2. Argument nicht angegeben!" && return 12
 # -------------------------------------------------------------------------------------------------
 # ----- START -------------------------------------------------------------------------------------
 # ----- ENDE --------------------------------------------------------------------------------------
 # -------------------------------------------------------------------------------------------------
 
-
+#https://www.youtube.com/watch?v=vT8UPd8m0MI&list=OLAK5uy_m6UGOy8-24i3SZPwsamm1fA46EIahHJ3c https://www.youtube.com/watch?v=vl74hcU7oms&list=OLAK5uy_kX4ZiqkP75af4Coy7ZtWtI38-XsefMpy0 https://www.youtube.com/watch?v=3ZR19D4S2qU&list=OLAK5uy_lEz74fZ2dxaFnfKL3rM9X2aN1Y7f5CHCo https://www.youtube.com/watch?v=Icf8XZcjYD8&list=OLAK5uy_nGNALm5yCOsdHc3RSRfw5bmOHdiZr-VrU https://www.youtube.com/watch?v=O0z7-2VqBz0&list=OLAK5uy_mx4xDuricthgehDqBlHwLwolm1U1G6FJg https://www.youtube.com/watch?v=DTT-BPWAf-g&list=OLAK5uy_k8x5xzy0HvFFJwgvy93qkPL4mPB1OlhEw&pp=0gcJCeECOCosWNin https://www.youtube.com/watch?v=eLAaQWatCZM&list=OLAK5uy_mCVVQ9Zoe52Nl2i9Hz4cDiu-0nOIobWA4 https://www.youtube.com/watch?v=jW8UlrtcEac&list=OLAK5uy_n7H9yY5gS_QZ9byDQ2GDsAE0oxTLqeXJQ https://www.youtube.com/watch?v=UX_OUkvkNfY&list=OLAK5uy_ltqLFvlOkvVtmXmQ8N7WC3qvqjPpUgZXc https://www.youtube.com/watch?v=39NqfWklaAQ&list=OLAK5uy_mjBgh9lV7AS0zZWkM5sN9bMdjEQ6646l8 https://www.youtube.com/watch?v=tLOq39rkmIw&list=OLAK5uy_kfkOQ9fhvPZM8xw_k8nhSW4QM-CZyPIW8 https://www.youtube.com/watch?v=Z86tLeodosg&list=OLAK5uy_nBp0_iDyA7Nn4499OKBPBRuxTvWi4rpAk
 
 
 function fncDEBUGstart {
@@ -112,6 +123,63 @@ function fncAUSLESENversion {
     
 }
 [ -z $dateiVersionInfoNr ] && fncAUSLESENversion
+
+
+function fncHHMMSS {
+    case "$1" in
+        ( nurZAHLEN )
+            echo -en `date '+%H%M%S'` ;;
+        ( nurSS )
+            echo -en `date '+%S'` ;;
+        ( nurSS.S )
+            echo -en `date '+%S.%N'` ;;
+        ( nurSS.mS3 )
+            HMSmS=`date '+%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:3}
+            echo -en $HMSxyz"."$mSxyz ;;
+        ( norm.mS2 )
+            HMSmS=`date '+%H:%M:%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:2}
+            echo -en $HMSxyz"."$mSxyz ;;
+        ( norm.mS3 )
+            HMSmS=`date '+%H:%M:%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:3}
+            echo -en $HMSxyz"."$mSxyz ;;
+        (*)
+            echo -en `date '+%H:%M:%S'` ;;
+    esac
+    #echo -en `date '+%H:%M:%S'`
+}
+
+function fncYEAR1231 {
+    case "$1" in
+        ( nurZAHLEN )
+            echo -en `date '+%Y%m%d'`
+            ;;
+        ( YEAR )
+            echo -en `date '+%Y'`
+            ;;
+        ( 12 )
+            echo -en `date '+%m'`
+            ;;
+        ( 31 )
+            echo -en `date '+%d'`
+            ;;
+        ( 1231 )
+            echo -en `date '+%m%d'`
+            ;;
+        (*)
+            echo -en `date '+%Y-%m-%d'`
+            ;;
+    esac
+}
+
 
 
 function fncANZAHLzeichen {
@@ -246,20 +314,29 @@ txtTITEL="Video-, Audiodateien oder komplette HTML-Seiten herunterladen!"
 
 
 
+# ***** Cache des Downloaders leeren: *************************************************************
 # -Nur Starten wenn NICHT:
-#  Logs, Hilfe, ShortcutCD (Verzeichniswechsel)
-#  aufgerufen wurden!
-#if ( [[ "$1" != -*l* ]] && [[ "$1" != -*h* ]] )
+#  Logs, Hilfe, ShortcutCD (Verzeichniswechsel) aufgerufen wurden!
+#
 if ( [[ "$1" != -*PS* ]] && [[ "$1" != -*l* ]] && [[ "$1" != -*h* ]] && [[ "$1" != -*scl* ]] && [[ "$1" != -*sccd* ]] && [[ "$1" != -*conf* ]] )
 then
-    # -Cache des Downloaders leeren bzw. löschen:
     echo -e "|-"
-    echo -e "|- $datei: Download Cache leeren: Gestartet..."
-    $strBefehlName -i -v --rm-cache-dir
+    echo -e "|- $datei: Download Cache leeren: START!"
+    echo -e "|-"
+    sleep 0.2
+    echo -e "|- $datei: $strBefehlName "`$strBefehlName --version`
+    echo -e "|-"
+    sleep 0.2
+    # -Cache leeren:
+    echo -e "|- $datei: $strBefehlName "`$strBefehlName -i -v --rm-cache-dir`
     #echo -e "--- Cache NICHT leeren! ---" && sleep 2
-    sleep 1
-    echo -e "|- $datei: Download Cache leeren: Fertig!"\\n"|-"
-    sleep 1
+    sleep 0.2
+    echo -e "|-"
+    sleep 0.2
+    echo -e "|- $datei: Download Cache leeren: FERTIG!"
+    sleep 0.2
+    echo -e "|-"
+    sleep 2
 fi
 
 
@@ -573,7 +650,21 @@ actionDATEIoptionen="$strBefehlName --config-locations $strBefehlKonfigDatei -v 
 # -BESSER: Logindaten bei Bedarf mittels Kdialog erfassen!
 # --Bietet die Möglichkeit für individuelle Logindaten bei den verschiedenen Videoportalen!
 #
+# -Impersonation: Teilweise von Webseiten verlangt, dabei wird der gleiche Browser genutzt
+#  wie bei den Cookies. Eine Liste der Möglichkeiten zeigt: "--list-impersonate-targets"
+# --Befehl: --impersonate chromium/firefox/edge/...
+
+actionLoginDatenBrowser="chromium"
+actionLoginDatenBrowser="firefox"
+actionLoginDatenBrowser=""
+actionLoginDatenBrowser="firefox"
+
+#actionLoginDaten=" --cookies-from-browser chromium"
+#actionLoginDaten=" --cookies-from-browser firefox"
+#actionLoginDaten=" --cookies-from-browser $actionLoginDatenBrowser --impersonate $actionLoginDatenBrowser"
 actionLoginDaten=""
+#actionLoginDaten=" --cookies-from-browser $actionLoginDatenBrowser --impersonate $actionLoginDatenBrowser"
+
 #actionLoginDaten=" -u demo -p demo"
 #actionLoginDatenWGET=" --user=demo --password=demo"
 #actionLoginDatenYoutube=" -u benutzer -p kennwort"
@@ -589,12 +680,23 @@ actionDATEIoptionen="$actionDATEIoptionen""$actionLoginDaten"
 #actionFORMAT="-f best"
 #actionFORMAT="-f height<1080"
 #actionFORMAT="-f best[height<1080]"
-actionFormatNorm="best[height<=720]/best"
+#actionFormatNorm="best[height>360]/best"
+#actionFormatNorm="best[height<=720]/best"
+# --Ohne Beschränkungen:
+#actionFormatNorm="best"
+#
 #actionFormatZdf="hls-2751-0+hls-aac-TV_Ton-0/"
 actionFormatZdf="bestvideo+hls-aac-TV_Ton-0/"
 actionFormatZdf=""
-actionFORMAT="-f ""$actionFormatZdf""$actionFormatNorm"
-#actionFORMAT=""
+
+actionFormatNorm=""
+actionFormatNorm="best"
+actionFormatNorm="bestvideo*+bestaudio/best"
+actionFormatNorm="best[height<=720]/best"
+# -Ohne Format Angabe wird bestes Ergebnis ggf aus Audio und Video zusammen geschnitten!
+actionFORMAT=""
+#[[ -n "$eins" ]] || [[ -n "$zwei" ]] && echo -e "--- ODER"
+[[ -n "$actionFormatZdf" ]] || [[ -n "$actionFormatNorm" ]] && actionFORMAT="-f ""$actionFormatZdf""$actionFormatNorm"
 
 
 # -Die Namen der Dateien zum Zwischenspeichern und Loggen festlegen:
@@ -621,7 +723,7 @@ txtStandardDownloadPlural="Videos"
 
 
 # -Wegen Kontrolle max Video Anzahl:
-typeset -i intAnzahlVideosMax=100
+typeset -i intAnzahlVideosMax=20
 
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -824,9 +926,10 @@ txtHILFE=$txtBENUTZUNG\\n\
 "|- -lM\\t\\tAusgabe der Logdatei mittels More, ansonsten wie '-l'."\\n\
 "|- -l?\\t\\tDirekt das Auswahlfenster für die Logdatei anzeigen und danach die Datei ausgeben."\\n\
 "|- -l?M\\t\\tAusgabe der Logdatei mittels More, ansonsten wie '-l?'."\\n\
-"|- -f\\t\\tDie Force Download Option nutzen. Dabei werden Datein auch dann heruntergeladen, wenn sie bereits"\\n\
+"|- -f\\t\\tDie Force Download Option nutzen. Dabei werden Dateien auch dann heruntergeladen, wenn sie bereits"\\n\
 "|-   \\t\\tim Archiv aufgeführt sind. Dies funktioniert nur bei Video- oder Audiodateien und es darf maximal"\\n\
-"|-   \\t\\teine Quiet Option gesetzt werden. Die Force Download Frage wird automatisch übersprungen."\\n\
+"|-   \\t\\teine Quiet Option gesetzt werden. Die Force Download Frage wird automatisch übersprungen und die"\\n\
+"|-   \\t\\tBegrenzung der maximalen Anzahl Videos pro URL ($intAnzahlVideosMax) wird aufgehoben!"\\n\
 "|-   \\t\\t'-f -q' ist dabei das Gleiche wie '-fq' oder '-qf'."\\n\
 "|- -cd\\t\\tÖffnet die Verzeichnisauswahl um das Skript in einem anderen Arbeitsverzeichnis auszuführen."\\n\
 "|-   \\t\\tDie Funktion wird immer ausgeführt! Ist also mächtiger als die Quiet Optionen oder die entsprechende"\\n\
@@ -1090,6 +1193,10 @@ flagForceGlobal="false"
 flagFEHLERlogs="false"
 flagFEHLERlogs2="false"
 
+flagSuche="false"
+strEingabeSuche=""
+typeset -i intEingabeSucheAnzahl=1
+
 befehlAUSGABEmore=""
 # -Die Argumente kontrollieren und neu aufteilen:
 # --ALLE normalen Optionen (-q,-h,...) werden im $strg1 gespeichert
@@ -1097,6 +1204,7 @@ befehlAUSGABEmore=""
 #for i in $*
 for i in "$@"
 do
+    # -Shortcut Funktion:
     eingabeSC=""
     eingabeSCurl=""
     if ( [[ "$flagSCglobal" == "true" ]] )
@@ -1105,7 +1213,7 @@ do
         #eingabeURL=${i//\-/}
         #eingabeURL=${i//\-url=/}
         #echo -e "|- DEBUG-INFO:\\n|- eingabeURL: $eingabeURL"
-        eingabeSC=$i
+        eingabeSC="$i"
         if ( [[ "$eingabeSC" != "" ]] )
         then
             fncDATEIconfAUSLESEN
@@ -1118,6 +1226,28 @@ do
         strg1=$strg1${i//\-/}
         #continue
     fi
+
+    # -Suchfunktion:
+    if ( [[ "$flagSuche" == "true" ]] )
+    then
+        strEingabeSuche="$i"
+        #continue
+    fi
+    if ( [[ "$i" == -s ]] )
+    then
+        flagSuche="true"
+        intEingabeSucheAnzahl=2
+        #strg1=$strg1${i//\-/}
+        #continue
+    fi
+    if ( [[ "$i" == -s:* ]] )
+    then
+        flagSuche="true"
+        #intEingabeSucheAnzahl=2
+        intEingabeSucheAnzahl=${i//\-s:/}
+        #continue
+    fi
+
     if ( [[ "$i" == -*M ]] )
     then
         flagMORE="true"
@@ -1234,7 +1364,7 @@ do
         #echo -e "|- DEBUG-INFO:\\n|- eingabeURL mit i: $eingabeURL"
     fi
     
-    # -Pfad aus Kommandozeile übernehmen:
+    # -Pfad aus Befehlszeile übernehmen:
     [[ -d "$i" ]] && pfad="$i"
 done
 
@@ -1452,6 +1582,11 @@ then
     fi
     exit 0;
 fi
+
+
+
+
+
 
 
 # -Die Logdatei anzeigen:
@@ -1863,7 +1998,7 @@ echo -e $txtINFOeingabeARBEITSVERZEICHNIS
 function fncDateienAuslesenAusgabe {
     # -Erwartet eine oder mehrere Dateien mittels $1, diese werden nacheinander
     #  ausgelesen, am Ende wird der Inhalt aller Dateien komplett ausgegeben!
-    [[ -z "$1" ]] && echo -e "|- FEHLER:"\\t"1. Argument nicht angegeben!" && return 11
+    [[ -z "$1" ]] && echo -e "|- ${FUNCNAME[0]} FEHLER:"\\t"1. Argument nicht angegeben!" && return 11
     #[[ -z "$2" ]] && echo -e "|- FEHLER:"\\t"2. Argument nicht angegeben!" && return 12
     
     arrDateien=($1)
@@ -2076,7 +2211,7 @@ function fncEINGABEdateiFAVORITEN {
     # -Falls es mehrere Dateien gibt, wird ein Auswahlfenster für Dateien geöffnet!
     
     vorgabePFAD=`pwd`
-    vorgabeFILTER="Favoritendatei (*.FAV.*txt)"
+    vorgabeFILTER="Favoritendatei (*URLS.FAV.*txt)"
     
     # -Es können mehrere Favoritendateien ausgewählt werden, diese werden ausgelesen, zusammengefasst und dann
     #  in $dateiURLSfav gespeichert!
@@ -2142,8 +2277,15 @@ iaLSarray=(`ls *$datei".URLS.FAV"*"txt" 2>/dev/null`)
 iaLSarrayANZAHL=${#iaLSarray[@]}
 if ( [[ ! -f "$dateiURLS" ]] && [[ $iaLSarrayANZAHL -gt 0 ]] )
 then
-    if ( [[ $iaLSarrayANZAHL -gt 1 ]] )
+    if ( [[ $iaLSarrayANZAHL -lt 2 ]] )
     then
+        # -Nur eine Favoritendatei vorhanden, Auswahl also unnötig. Diese Favoritendatei wird
+        #  zur $dateiURLSfav kopiert:
+        cp ${iaLSarray[0]} $dateiURLSfav
+    else
+    #if ( [[ $iaLSarrayANZAHL -gt 1 ]] )
+    #then
+        # -Mehrere Favoritendateien, daher wird die Dateiauswahl gestartet:
         fncEINGABEdateiFAVORITEN
         flagFavoritenAuswahl="durch-benutzer"
     fi
@@ -2358,6 +2500,7 @@ then
         flagForceGlobal="true"
     fi
 fi
+[[ "$flagForceGlobal" == "true" ]] && intAnzahlVideosMax="0"
 # ----- ENDE Force Option abfragen ------------------------------------------------------------
 # ---------------------------------------------------------------------------------------------
 
@@ -2377,7 +2520,7 @@ then
     # -Playlistreihenfolge festlegen:
     actionBEFEHLreihenfolge=""
     txtActionBefehlReihenfolge=""
-    if ( [[ "$eingabeURL" == *list* ]] || [[ "$eingabeURL" == *channel* ]] )
+    if ( [[ "$eingabeURL" == *list* ]] || [[ "$eingabeURL" == *channel* ]] || [[ "$eingabeURL" == *@* ]] )
     then
         # -Bei Playlisten mit verschiedenen Videos/Musiktiteln kann von NEU-zu-ALT (--playlist-reverse)
         #  sinnvoll sein, aber bei Playlisten mit kompletten Musik Alben ist die korrekte Reihenfolge
@@ -2487,10 +2630,10 @@ then
     Grafikdatei abgespeichert werden soll, wählen Sie eine der Optionen mit \"Thumbnail\".<br>\
     Wenn Sie HTML-Seiten mit allen Ebenen herunterladen, kann die Datenmenge sehr<br>\
     umfangreich werden.<br><br>\
-    Standard: \"Nur Video\"<hr><br>\
+    Standard: \"Nur Audio\"<hr><br>\
     Dateiformate auswählen:<br>" \
-    "Nur Video" "Nur Video (mp4)" on \
-    "Nur Audio" "Nur Audio (mp3)" off \
+    "Nur Audio" "Nur Audio (mp3)" on \
+    "Nur Video" "Nur Video (mp4)" off \
     "Audio und Thumbnail" "Audio und Thumbnail (mp3, jpg)" off \
     "Video und Audio" "Video und Audio (mp4, mp3)" off \
     "Video, Audio und Thumbnail" "Video, Audio und Thumbnail (mp4, mp3, jpg)" off \
@@ -2505,15 +2648,15 @@ then
         (0)
             # -Case für Eingabeüberwachung:
             case "$auswahlACTION" in
-                ("Nur Video")
-                    actionBEFEHL="$actionDATEIoptionen $actionFORMAT"
-                    txtStandardDownloadSingular="Video"
-                    txtStandardDownloadPlural="Videos"
-                    ;;
                 ("Nur Audio")
                     actionBEFEHL="$actionDATEIoptionen -x --audio-format mp3 --audio-quality 0 --embed-thumbnail"
                     txtStandardDownloadSingular="Audiodatei"
                     txtStandardDownloadPlural="Audiodateien"
+                    ;;
+                ("Nur Video")
+                    actionBEFEHL="$actionDATEIoptionen $actionFORMAT"
+                    txtStandardDownloadSingular="Video"
+                    txtStandardDownloadPlural="Videos"
                     ;;
                 ("Audio und Thumbnail")
                     actionBEFEHL="$actionDATEIoptionen -x --audio-format mp3 --audio-quality 0 --embed-thumbnail --write-thumbnail"
@@ -2596,10 +2739,16 @@ txtINFOauswahlACTION="|- -Speichern:\\t\\t\\t$auswahlACTION"
 
 
 
+
+
+
+
+
+
 # ---------------------------------------------------------------------------------------------
 # ----- START Modus actionBEFEHL für Playlist festlegen ---------------------------------------
 FlagModusBefehlPlaylist="komplett"
-if ( [[ "$strg1" != -*qqqq* ]] && [[ "$eingabeURL" == *list* ]] || [[ "$eingabeURL" == *channel* ]] )
+if ( [[ "$strg1" != -*qqqq* ]] && [[ "$eingabeURL" == *list* ]] || [[ "$eingabeURL" == *channel* ]] || [[ "$eingabeURL" == *@* ]]  )
 then
     # -Modus actionBEFEHL für Playlist festlegen:
     # --komplett: die komplette Playliste wird zum Download übergeben
@@ -2694,6 +2843,18 @@ echo -e $txtINFOauswahlACTION
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 # --------------------------------------------------------------------
 # ----- START actionBEFEHL Korrekturen -------------------------------
 # -Nur bei $strBefehlName Aufrufen:
@@ -2705,8 +2866,9 @@ then
     # -Den eingebauten Downloader anstatt ffmpeg nutzen, da ffmpeg kein Resume unterstützt und
     #  der Beendet-Status nicht korrekt an das Skript weitergeleitet wird!
     #  --hls-prefer-native ODER --hls-prefer-ffmpeg ODER keine Angabe
-    #sactionBEFEHL="$actionBEFEHL --hls-prefer-native"
-    
+    #actionBEFEHL="$actionBEFEHL --hls-prefer-ffmpeg"
+    actionBEFEHL="$actionBEFEHL --hls-prefer-native"
+
     # -Zusatz wegen HTTP-Fehler 412, precondition failed, urllib2
     #actionBEFEHL="$actionBEFEHL --add-header Accept:'*/*'"
     #actionBEFEHL="$actionBEFEHL --no-geo-bypass"
@@ -2997,17 +3159,19 @@ flagNEXTdatei="false"
 flagCHECKurlsKOMPLETT="false"
 FlagModusBefehlKOMPLETTquit=""
 
-
 # -URL Array bilden:
 read -a eingabeURLarray <<zzzTRENNERzzz
 $eingabeURL
 zzzTRENNERzzz
 
-
 # -Wenn nur eine Playliste angegeben wurde und gleichzeitig als Download Modus "einzeln"
 #  ausgewählt wurde: Videos können über die Id oder einen Zahlenraum definiert werden!
 typeset -i intAnzUrlsGesamt=${#eingabeURLarray[@]}
 #[ $intAnzUrlsGesamt -eq 1 ] && [[ "$FlagModusBefehlPlaylist" == "einzeln" ]]
+
+
+
+
 
 
 
@@ -3018,7 +3182,16 @@ function fncBefehlOutputOptionen {
     actionPOSTbefehl=" --exec 'echo {} $txtPLAYLISTaktuell{}'"
     #actionBEFEHLoutputVIDEO=" -o %(title)s-%(id)s.%(ext)s"
     #actionBEFEHLoutputVIDEO=" -o %(title)s_%(id)s.%(ext)s"
-    actionBEFEHLoutputVIDEO=" --autonumber-start $zURL -o %(autonumber)03d_%(title)s.%(ext)s"
+
+    flagURLisChannelModel="false"
+    strChannelModelUVZ=""
+    txtURLAktuellAusArray="${eingabeURLarray[$z]}"
+    # -Falls Channel/Model in URL ist, wird dies als UVZ genutzt. Nur so funktioniert die
+    #  Überwachung der $intAnzahlVideosMax!
+    [[ "$txtURLAktuellAusArray" == *channel* ]] || [[ "$txtURLAktuellAusArray" == *model* ]] && flagURLisChannelModel="true"
+    [[ "$flagURLisChannelModel" == "true" ]] && strChannelModelUVZ="${txtURLAktuellAusArray//*\//}""/"
+
+    actionBEFEHLoutputVIDEO=" --autonumber-start $zURL -o $strChannelModelUVZ%(autonumber)03d_%(title)s.%(ext)s"
     # -Output Optionen für Playliste:
     # --playlist: Name oder ID der Playliste
     # --playlist_id: ID der Playliste
@@ -3037,6 +3210,8 @@ function fncBefehlOutputOptionen {
 function fncBEFEHLaufrufen {
     typeset -i z=0
     typeset -i zURL=1
+
+
 #     read -a eingabeURLarray <<zzzTRENNERzzz
 #     $eingabeURL
 # zzzTRENNERzzz
@@ -3092,11 +3267,11 @@ function fncBEFEHLaufrufen {
         # -Alte doppelte Abfrage, vor Einbau !=*.youtube.*
         #[[ "${eingabeURLarray[$z]}" == *list* ]] || [[ "${eingabeURLarray[$z]}" == *channel* ]] && strPLAYLISTflatJSON=`$strBefehlName --flat-playlist --dump-single-json ${eingabeURLarray[$z]} 2>/dev/null`
         #[[ "${eingabeURLarray[$z]}" == *list* ]] || [[ "${eingabeURLarray[$z]}" == *channel* ]] && intPLAYLISTitemsMAX=`echo -e $strPLAYLISTflatJSON | grep -i -o '{"url"' | wc -l 2>/dev/null`
-        [[ "${eingabeURLarray[$z]}" == *list* ]] || [[ "${eingabeURLarray[$z]}" == *channel* ]] && [[ "${eingabeURLarray[$z]}" != *.youtube.* ]] && strPLAYLISTflatJSON=`$strBefehlName --flat-playlist --dump-single-json ${eingabeURLarray[$z]} 2>/dev/null`
-        [[ "${eingabeURLarray[$z]}" == *list* ]] || [[ "${eingabeURLarray[$z]}" == *channel* ]] && [[ "${eingabeURLarray[$z]}" != *.youtube.* ]] && intPLAYLISTitemsMAX=`echo -e $strPLAYLISTflatJSON | grep -i -o '{"url"' | wc -l 2>/dev/null`
+        [[ "${eingabeURLarray[$z]}" == *list* ]] || [[ "${eingabeURLarray[$z]}" == *channel* ]] || [[ "${eingabeURLarray[$z]}" == *@* ]] && [[ "${eingabeURLarray[$z]}" != *.youtube.* ]] && strPLAYLISTflatJSON=`$strBefehlName --flat-playlist --dump-single-json ${eingabeURLarray[$z]} 2>/dev/null`
+        [[ "${eingabeURLarray[$z]}" == *list* ]] || [[ "${eingabeURLarray[$z]}" == *channel* ]] || [[ "${eingabeURLarray[$z]}" == *@* ]] && [[ "${eingabeURLarray[$z]}" != *.youtube.* ]] && intPLAYLISTitemsMAX=`echo -e $strPLAYLISTflatJSON | grep -i -o '{"url"' | wc -l 2>/dev/null`
         
-        [[ "${eingabeURLarray[$z]}" == *list* ]] || [[ "${eingabeURLarray[$z]}" == *channel* ]] && [[ "${eingabeURLarray[$z]}" == *.youtube.* ]] && strPLAYLISTflatJSON=`$strBefehlName --flat-playlist ${eingabeURLarray[$z]} 2>/dev/null`
-        [[ "${eingabeURLarray[$z]}" == *list* ]] || [[ "${eingabeURLarray[$z]}" == *channel* ]] && [[ "${eingabeURLarray[$z]}" == *.youtube.* ]] && intPLAYLISTitemsMAX=`echo -e $strPLAYLISTflatJSON | grep -i -o 'Downloading video' | wc -l 2>/dev/null`
+        [[ "${eingabeURLarray[$z]}" == *list* ]] || [[ "${eingabeURLarray[$z]}" == *channel* ]] || [[ "${eingabeURLarray[$z]}" == *@* ]] && [[ "${eingabeURLarray[$z]}" == *.youtube.* ]] && strPLAYLISTflatJSON=`$strBefehlName --flat-playlist ${eingabeURLarray[$z]} 2>/dev/null`
+        [[ "${eingabeURLarray[$z]}" == *list* ]] || [[ "${eingabeURLarray[$z]}" == *channel* ]] || [[ "${eingabeURLarray[$z]}" == *@* ]] && [[ "${eingabeURLarray[$z]}" == *.youtube.* ]] && intPLAYLISTitemsMAX=`echo -e $strPLAYLISTflatJSON | grep -i -o 'Downloading video' | wc -l 2>/dev/null`
         
         
         function fncPlaylistVideoIDs {
@@ -3213,7 +3388,8 @@ function fncBEFEHLaufrufen {
             checkBEFEHLinternPID=$!
             
             # -Limit erhöhen und Zeitbedarf checken: 
-            cpulimit -p $checkBEFEHLinternPID -q -z -c 2 -l 10 &
+            #cpulimit -p $checkBEFEHLinternPID -q -z -c 4 -l 60 &
+            [[ -n "$checkBEFEHLinternPID" ]] && cpulimit -p $checkBEFEHLinternPID -q -z -c 4 -l 60 &
             
             
             #echo -e "--- DEBUG-INFO: BEFEHLinternPID: $checkBEFEHLinternPID - BEFEHLinternRETURN: $checkBEFEHLinternRETURN"
@@ -3261,7 +3437,7 @@ function fncBEFEHLaufrufen {
             vorgabeTTY=${vorgabeTTY//\/dev\//}
             
             #iaLSarray=(`ps -C cpulimit --tty $iaTERMINAL -o pid=`)
-            iaLSarray=(`ps -C cpulimit -o pid=`)
+            iaLSarray=(`ps -C "$1" -o pid=`)
             typeset -i zz=0
             typeset -i zzTTY=0
             for ia in ${iaLSarray[@]}
@@ -3281,8 +3457,24 @@ function fncBEFEHLaufrufen {
                 zz=zz+1
             done
             }
-            fncKILLpidLISTE "cpulimit" >/dev/null 2>&1
-            
+
+
+            # ----------------------------------------------------------------------
+            # --- BUG ZuVieleProzesse ----------------------------------------------
+            # ----------------------------------------------------------------------
+            # -Der mit dem checkBEFEHL gestartete Prozess sollte beendet sein, daher kann er jetzt problemlos,
+            #  sicherheitshalber beendet/gekillt werden! Und alle seine Kindprozesse...
+            fncKILLpid $checkBEFEHLinternPID "-15" >>$dateiLOGS 2>&1
+            # ----------------------------------------------------------------------
+            # ----------------------------------------------------------------------
+
+            # -Die CPU Ueberwachung des checkBEFEHL Prozesses beenden:
+            #fncKILLpidLISTE "cpulimit" >/dev/null 2>&1
+            #fncKILLpidLISTE "cpulimit" >>$dateiLOGS 2>&1
+            #fncKILLpidLISTE "cpulimit"
+            fncKILLpidLISTE "cpulimit" >>$dateiLOGS 2>&1
+
+
             #[ -f $dateiCACHEplsINFOS ] &&
             #echo -e "$checkBEFEHLinternRETURN" > "$datei.$$.cache.internRETURN.02.tmp"
         done
@@ -3336,11 +3528,11 @@ function fncBEFEHLaufrufen {
         # -Alte doppelte Abfrage, vor Einbau !=*.youtube.*
         #[[ "${eingabeURLarray[$z]}" == *list* ]] || [[ "${eingabeURLarray[$z]}" == *channel* ]] && strPLAYLISTflatJSON=`$strBefehlName --flat-playlist --dump-single-json ${eingabeURLarray[$z]} 2>/dev/null`
         #[[ "${eingabeURLarray[$z]}" == *list* ]] || [[ "${eingabeURLarray[$z]}" == *channel* ]] && intPLAYLISTitemsMAX=`echo -e $strPLAYLISTflatJSON | grep -i -o '{"url"' | wc -l 2>/dev/null`
-        [[ "${eingabeURLarray[$z]}" == *list* ]] || [[ "${eingabeURLarray[$z]}" == *channel* ]] && [[ "${eingabeURLarray[$z]}" != *.youtube.* ]] && strPLAYLISTflatJSON=`$strBefehlName --flat-playlist --dump-single-json ${eingabeURLarray[$z]} 2>/dev/null`
-        [[ "${eingabeURLarray[$z]}" == *list* ]] || [[ "${eingabeURLarray[$z]}" == *channel* ]] && [[ "${eingabeURLarray[$z]}" != *.youtube.* ]] && intPLAYLISTitemsMAX=`echo -e $strPLAYLISTflatJSON | grep -i -o '{"url"' | wc -l 2>/dev/null`
+        [[ "${eingabeURLarray[$z]}" == *list* ]] || [[ "${eingabeURLarray[$z]}" == *model* ]] || [[ "${eingabeURLarray[$z]}" == *channel* ]] || [[ "${eingabeURLarray[$z]}" == *@* ]] && [[ "${eingabeURLarray[$z]}" != *.youtube.* ]] && strPLAYLISTflatJSON=`$strBefehlName --flat-playlist --dump-single-json ${eingabeURLarray[$z]} 2>/dev/null`
+        [[ "${eingabeURLarray[$z]}" == *list* ]] || [[ "${eingabeURLarray[$z]}" == *model* ]] || [[ "${eingabeURLarray[$z]}" == *channel* ]] || [[ "${eingabeURLarray[$z]}" == *@* ]] && [[ "${eingabeURLarray[$z]}" != *.youtube.* ]] && intPLAYLISTitemsMAX=`echo -e $strPLAYLISTflatJSON | grep -i -o '{"url"' | wc -l 2>/dev/null`
         
-        [[ "${eingabeURLarray[$z]}" == *list* ]] || [[ "${eingabeURLarray[$z]}" == *channel* ]] && [[ "${eingabeURLarray[$z]}" == *.youtube.* ]] && strPLAYLISTflatJSON=`$strBefehlName --flat-playlist ${eingabeURLarray[$z]} 2>/dev/null`
-        [[ "${eingabeURLarray[$z]}" == *list* ]] || [[ "${eingabeURLarray[$z]}" == *channel* ]] && [[ "${eingabeURLarray[$z]}" == *.youtube.* ]] && intPLAYLISTitemsMAX=`echo -e $strPLAYLISTflatJSON | grep -i -o 'Downloading video' | wc -l 2>/dev/null`
+        [[ "${eingabeURLarray[$z]}" == *list* ]] || [[ "${eingabeURLarray[$z]}" == *channel* ]] || [[ "${eingabeURLarray[$z]}" == *@* ]] && [[ "${eingabeURLarray[$z]}" == *.youtube.* ]] && strPLAYLISTflatJSON=`$strBefehlName --flat-playlist ${eingabeURLarray[$z]} 2>/dev/null`
+        [[ "${eingabeURLarray[$z]}" == *list* ]] || [[ "${eingabeURLarray[$z]}" == *channel* ]] || [[ "${eingabeURLarray[$z]}" == *@* ]] && [[ "${eingabeURLarray[$z]}" == *.youtube.* ]] && intPLAYLISTitemsMAX=`echo -e $strPLAYLISTflatJSON | grep -i -o 'Downloading video' | wc -l 2>/dev/null`
         
         
         [ $intPLAYLISTitemsMAX -lt 1 ] && intPLAYLISTitemsMAX=1
@@ -3395,8 +3587,12 @@ function fncBEFEHLaufrufen {
             checkBEFEHLinternPID=$!
             
             # -Limit erhöhen und Zeitbedarf checken: 
-            cpulimit -p $checkBEFEHLinternPID -q -z -c 2 -l 10 &
-            
+            # -FEHLER: Speicherzugriffsfehler  (Speicherabzug geschrieben) cpulimit -p...
+            #
+            #  cpulimit -p $checkBEFEHLinternPID -q -z -c 4 -l 60 &
+            #  -Die m Option wegen Speicherfehler entfernt!
+            [[ -n "$checkBEFEHLinternPID" ]] && cpulimit -p $checkBEFEHLinternPID -q -z -c 4 -l 60 &
+
             
             # -DEBUG START
             #intSSpopup=10
@@ -3440,7 +3636,7 @@ function fncBEFEHLaufrufen {
             vorgabeTTY=${vorgabeTTY//\/dev\//}
             
             #iaLSarray=(`ps -C cpulimit --tty $iaTERMINAL -o pid=`)
-            iaLSarray=(`ps -C cpulimit -o pid=`)
+            iaLSarray=(`ps -C "$1" -o pid=`)
             typeset -i zz=0
             typeset -i zzTTY=0
             for ia in ${iaLSarray[@]}
@@ -3460,11 +3656,24 @@ function fncBEFEHLaufrufen {
                 zz=zz+1
             done
             }
+
+
+            # ----------------------------------------------------------------------
+            # --- BUG ZuVieleProzesse ----------------------------------------------
+            # ----------------------------------------------------------------------
+            # -Der mit dem checkBEFEHL gestartete Prozess sollte beendet sein, daher kann er jetzt problemlos,
+            #  sicherheitshalber beendet/gekillt werden! Und alle seine Kindprozesse...
+            fncKILLpid $checkBEFEHLinternPID "-15" >>$dateiLOGS 2>&1
+            # ----------------------------------------------------------------------
+            # ----------------------------------------------------------------------
+
+            # -Die CPU Ueberwachung des checkBEFEHL Prozesses beenden:
             #fncKILLpidLISTE "cpulimit" >/dev/null 2>&1
-            #fncKILLpidLISTE "cpulimit" >>$dateiLOGS 2>>&1
-            fncKILLpidLISTE "cpulimit"
-            
-            
+            #fncKILLpidLISTE "cpulimit" >>$dateiLOGS 2>&1
+            #fncKILLpidLISTE "cpulimit"
+            fncKILLpidLISTE "cpulimit" >>$dateiLOGS 2>&1
+
+
             #[ -f $dateiCACHEplsINFOS ] &&
             #echo -e "$checkBEFEHLinternRETURN" > "$datei.$$.cache.internRETURN.02.tmp"
             
@@ -4340,7 +4549,7 @@ function fncStatusLogsAuslesen {
         #(( intTimestamp > intTimestampCheckReload )) && intTimestampCheckReload=intTimestamp+120 && kdialog --title "#.video" --passivepopup "Video-Anzahl:<br><br>$intAnzahlVideosLive von $intAnzahlVideosMax<br>Verzeichnis: $strDownloadUvzAktuell" 10 &
         (( intTimestamp > intTimestampCheckReload )) && intTimestampCheckReload=intTimestamp+120
         
-        (( $intAnzahlVideosLive > $intAnzahlVideosMax )) && [[ "$flagNEXTurl" != "true" ]] && echo -e "flagNEXTurl" >> $dateiCACHEflagQUIT && echo -e "$strDownloadUvzAktuell" >> $dateiCACHEflagQUIT && kdialog --title "max.video" --passivepopup "Video-Anzahl:<br> Maximum erreicht!<br>$intAnzahlVideosLive von $intAnzahlVideosMax<br>Verzeichnis: $strDownloadUvzAktuell" 10 &
+        [[ "$intAnzahlVideosMax" != "0" ]] && (( $intAnzahlVideosLive > $intAnzahlVideosMax )) && [[ "$flagNEXTurl" != "true" ]] && echo -e "flagNEXTurl" >> $dateiCACHEflagQUIT && echo -e "$strDownloadUvzAktuell" >> $dateiCACHEflagQUIT && kdialog --title "max.video" --passivepopup "Video-Anzahl:<br> Maximum erreicht!<br>$intAnzahlVideosLive von $intAnzahlVideosMax<br>Verzeichnis: $strDownloadUvzAktuell" 10 &
     fi
     #
     # *****************************************************************************************

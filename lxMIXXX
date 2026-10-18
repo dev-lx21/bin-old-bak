@@ -67,6 +67,34 @@ function fncKILLpid {
 
 
 
+
+
+#echo -e "---> $datei startet Mixxx - $strAusgabeDatei"
+echo -e "---> $datei startet Mixxx..."
+
+
+# -Pulseaudio wird pausiert!
+#[[ `pasuspender -- mixxx` ]] || mixxx
+#pasuspender -- /usr/bin/mixxx
+
+
+# -Ohne Jack Server, mur Pipewire läuft
+mixxx
+intMixxxPID=$!
+
+sleep 0.5
+fncKILLpid "$intMixxxPID"
+
+exit 0;
+
+
+
+
+
+
+
+
+
 # -Jack Connection Kit starten:
 #jackd -d alsa --device hw:2 --rate 44100 --period 128 &
 #jackd -d alsa --device hw:MKII --rate 44100 --period 128 &

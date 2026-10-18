@@ -1,0 +1,1878 @@
+#!/bin/bash
+# script von -lx-
+
+
+
+# -------------------------------------------------------------------------------------------------------------
+# ----- START Format Parameter setzen ------------------------------------------------------------
+# -Display testen:
+if [[ `tty` != *dev* ]]
+then
+    # -Wenn KEIN Display vorhanden ist, handelt es sich um einen Cronjob!
+    # -da tput nur mit $TERM funktioniert werden die Format Variablen geleert:
+    fmtFETT=""
+    fmtINVERS=""
+    fmtUNTERSTRICHEN=""
+    fmtRESET=""
+else
+    fmtFETT=`tput bold`
+    fmtINVERS=`tput rev`
+    fmtUNTERSTRICHEN=`tput smul`
+    fmtRESET=`tput sgr0`
+fi
+# ----- ENDE Format Parameter setzen -------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------
+
+
+
+
+pfad=`pwd`
+pfad="$pfad/"
+zeitSTART=`date`
+flagACTION="false"
+flagKEINpfad="false"
+
+datei=${0//*\//}
+txtTITEL="Infos über Dateien, Verzeichnisse oder das System anzeigen!"
+nutzer=`ps --pid $$ -o user=`
+
+
+
+
+
+
+# -------------------------------------------------------------------
+# ----- START Optionen Kontrolle ------------------------------------
+# -Falls eine der eingegebenen Stringparameter nicht mit "-" anfängt
+#  wird diese als pfad gesetzt!
+for i in "$@"
+do
+    # -Stringparameter einzeln prüfen:
+    if ( [[ "$i" != "" ]] )
+    then
+        if ( [[ "$i" != -* ]] )
+            then
+            #echo -e "--- String fängt nicht mit "-" an! ---"
+            #echo -e "--- String ist keine Option, also Pfad! ---"
+            pfad="$i"
+        else
+            flagKEINpfad="true"
+        fi
+    fi
+done
+# ----- ENDE Optionen Kontrolle -------------------------------------
+# -------------------------------------------------------------------
+
+
+
+
+# -------------------------------------------------------------------
+# ----- START pfad-kontrolle ----------------------------------------
+# -den pfad pruefen, ggf korrigieren, ggf FEHLER ausgeben!
+if ( [[ "$pfad" != "" ]] )
+then
+    #echo -e "--- pfad-nicht-leer ---"
+    if ( [[ "$pfad" != */ ]] )
+        then
+        #echo -e "--- pfad-hat-kein-slash ---"
+        pfad="$pfad/"
+    fi
+else
+    #echo -e "--- pfad-ist-leer ---"
+    # aktueller ort wird als pfad angenommen:
+    pfad=`pwd`
+    pfad="$pfad/"
+    #kdialog --msgbox="Pfad: $pfad"
+fi
+# pfad pruefen und ggf FEHLER ausgeben:
+if ( [[ -d "$pfad" ]] )
+then
+    fehler=0
+else
+    fehler=1
+    kdialog --title="FEHLER" --error="FEHLER:\nDas Verzeichnis lässt sich nicht öffnen. Bitte überprüfen Sie Ihre Eingabe! Vielleicht ein Tippfehler oder ungenügende Zugriffsrechte.\n\nVerzeichnis:\n$pfad\n\n\nDas Script wird beendet."
+    exit 0;
+fi
+# ----- ENDE pfad-kontrolle -----------------------------------------
+# -------------------------------------------------------------------
+
+
+
+
+
+
+# -------------------------------------------------------------------------------------------------------------
+# ----- START Prozess Option --------------------------------------------------------------------------
+# -Der Elternprozess und dessen Kindprozesse müssen gesucht werden!
+#arrPROZESSE=($datei youtube-dl)
+arrPROZESSE=($datei)
+
+if ( [[ "$1" == "-PS" ]] )
+then
+    echo -e "-"\\n"--- Eigene Prozesse anzeigen: ---------------------------------------------------------------------"\\n"-"
+    for i in "${arrPROZESSE[@]}"
+    do
+        echo -e "- Prozess: $i:"
+        ausgabe=`lxPS -q $i`
+        if ( [[ "$ausgabe" != "" ]] )
+        then
+            echo -e "$ausgabe"
+        else
+            echo -e "- INFO: $i wurde nicht in der Prozessliste gefunden!"
+        fi
+        echo -e "-"
+    done
+    exit 0;
+fi
+
+if ( [[ "$1" == "-PSK" ]] )
+then
+    echo -e "-"\\n"--- Eigene Prozesse anzeigen und beenden (kill): --------------------------------------------------"\\n"-"
+    for i in "${arrPROZESSE[@]}"
+    do
+        echo -e "- Prozess: $i:"
+        ausgabe=`lxPS -q $i`
+        if ( [[ "$ausgabe" != "" ]] )
+        then
+            echo -e "$ausgabe"
+            ausgabePIDs=`lxPS -pid $i`
+            ausgabePIDs=${ausgabePIDs//$$/}
+            for ii in $ausgabePIDs
+            do
+                nix=1
+                #echo -e "- PIDs: "$ii
+                #ps -ppid $ii -o pid=
+                ausgabeCHILDPIDsTMP=`ps --ppid $ii -o pid=`
+                ausgabeCHILDPIDs=$ausgabeCHILDPIDs" "$ausgabeCHILDPIDsTMP
+            done
+            #echo -e "- PIDs: "$ausgabePIDs
+            #echo -e "- CPIDs:"$ausgabeCHILDPIDs
+            if ( [[ "$ausgabePIDs" != "" ]] )
+            then
+                echo -e "- kill -9 "$ausgabePIDs $ausgabeCHILDPIDs
+                kill -9 $ausgabePIDs $ausgabeCHILDPIDs
+            else
+                echo -e "- INFO: Keine Prozesse zum Beenden gefunden!"
+            fi
+        else
+            echo -e "- INFO: $i wurde nicht in der Prozessliste gefunden!"
+        fi
+        echo -e "-"
+    done
+    exit 0;
+fi
+
+# ----- ENDE Prozess Option ---------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+# -------------------------------------------------------------------
+# -------------------------------------------------------------------
+# ----- START Umwandeln Optionen zu Befehl --------------------------
+
+strBEFEHL=""
+
+# -Arrays mit Optionen und entsprechenden Befehlen füllen!
+arrOPTIONEN[0]=""
+arrBEFEHLE[0]=""
+arrOPTIONENtxtINFO[0]=""
+
+
+arrOPTIONEN[0]="-du"
+arrBEFEHLE[0]="du -h --max-depth 0"
+arrOPTIONENtxtINFO[0]="Die Speicherbelegung für das Verzeichnis anzeigen."
+
+arrOPTIONEN[1]="-duR"
+arrBEFEHLE[1]="du -h --max-depth 1"
+arrOPTIONENtxtINFO[1]="Die Speicherbelegung für das Verzeichnis und seine Unterverzeichnisse anzeigen."
+
+arrOPTIONEN[2]="-ls"
+arrBEFEHLE[2]="ls -lA --group-directories-first"
+arrOPTIONENtxtINFO[2]="Den Kompletten Inhalt des Verzeichnis als Liste anzeigen."
+
+arrOPTIONEN[3]="-lsR"
+arrBEFEHLE[3]="ls -lAR --group-directories-first"
+arrOPTIONENtxtINFO[3]="Den Kompletten Inhalt des Verzeichnis und der Unterverzeichnisse (rekursiv) als Liste anzeigen."
+
+arrOPTIONEN[4]="-ps"
+arrBEFEHLE[4]="lxPS"
+arrOPTIONENtxtINFO[4]="Die laufenden Prozesse anzeigen. Wurde kein Suchbegriff gesetzt werden alle aufgelistet."
+
+arrOPTIONEN[5]="-df"
+arrBEFEHLE[5]="df -h"
+arrOPTIONENtxtINFO[5]="Die Speicherbelegung aller (ohne Pfad) oder nur einer bestimmten (mit Pfad) Partition anzeigen."
+
+
+
+
+# -Funktion zum Vergleichen der Eingabe mit den gespeicherten
+#  Optionen und zum Zusammenbau des Befehls!
+# -$i ist der eingegebene Stringparameter!
+function fncOPTIONEN2BEFEHL () {
+    typeset -i intFELD=0
+    for strOPTION in ${arrOPTIONEN[@]}
+    do
+        # -Optionen aus Array einzeln prüfen:
+        if ( [[ "$strOPTION" != "" ]] )
+        then
+            # -Vergleich Stringparameter-Optionen
+            if ( [[ "$i" == "$strOPTION" ]] )
+            then
+                # -Sonderfall: Option ist "-df" und kein Pfad gesetzt:
+                if ( ( [[ "$i" == "-df" ]] ) && ( [[ "$flagKEINpfad" == "true" ]] ) )
+                then
+                    if ( [[ "$strBEFEHL" == "" ]] )
+                    then
+                        strBEFEHL=${arrBEFEHLE[$intFELD]}
+                        txtBEFEHL="$strBEFEHL"
+                        strBEFEHL=`$strBEFEHL`
+                        break
+                    else
+                        strBEFEHL2=${arrBEFEHLE[$intFELD]}
+                        txtBEFEHL2="$strBEFEHL2"
+                        txtBEFEHL="$txtBEFEHL && $txtBEFEHL2"
+                        strBEFEHL2=`$strBEFEHL2`
+                        strBEFEHL="$strBEFEHL\\n|====================\\n$strBEFEHL2"
+                        break
+                    fi
+                fi
+                # -Normalfall:
+                if ( [[ "$strBEFEHL" == "" ]] )
+                then
+                    strBEFEHL=${arrBEFEHLE[$intFELD]}
+                    txtBEFEHL="$strBEFEHL $pfad"
+                    strBEFEHL=`$strBEFEHL $pfad`
+                    break
+                else
+                    strBEFEHL2=${arrBEFEHLE[$intFELD]}
+                    txtBEFEHL2="$strBEFEHL2 $pfad"
+                    txtBEFEHL="$txtBEFEHL && $txtBEFEHL2"
+                    strBEFEHL2=`$strBEFEHL2 $pfad`
+                    strBEFEHL="$strBEFEHL\\n|====================\\n$strBEFEHL2"
+                    break
+                fi
+            fi
+        fi
+        intFELD=intFELD+1
+    done
+}
+
+
+# -Schleife mit den Stringparametern!
+for i in "$@"
+do
+    # -Stringparameter einzeln prüfen:
+    if ( [[ "$i" != "" ]] )
+    then
+        # -Funktion zum Vergleichen:
+        fncOPTIONEN2BEFEHL
+    fi
+done
+# ----- ENDE Optionen Kontrolle -------------------------------------
+# -------------------------------------------------------------------
+# -------------------------------------------------------------------
+
+
+
+# -Standard Befehl setzen:
+if ( [[ "$strBEFEHL" == "" ]] )
+then
+    strBEFEHL=${arrBEFEHLE[0]}
+    txtBEFEHL="$strBEFEHL $pfad"
+    strBEFEHL=`$strBEFEHL $pfad`
+fi
+
+
+
+
+
+
+
+
+# -die Namen der Dateien zum Zwischenspeichern und Loggen festlegen:
+#dateiURLS="00_$datei.URLS.txt"
+dateiLOGS="00_$datei.LOGS.txt"
+dateiLOGStmp="00_$datei.LOGS.txt.tmp"
+
+txtHR="|--------------------------------------------------------------------------------"
+
+txtKOPF=\
+"|--------------------------------------------------------------------------------"\\n\
+"|- $datei -| "
+
+txtKOPFlogs=$txtKOPF"Logdatei"\\n\
+"|--------------------------------------------------------------------------------"\\n\
+"|- $zeitSTART"\\n\
+"|-"
+
+txtKOPF=$txtKOPF$txtTITEL\\n\
+"|--------------------------------------------------------------------------------"\\n\
+"|- $zeitSTART"\\n\
+"|-"
+
+
+
+
+
+txtBENUTZUNG=\
+"|- Benutzung:"\\n\
+"|- '$datei [OPTIONEN] [PFAD/SUCHBEGRIFF]'"\\n\
+"|- Informationen über Dateien, Verzeichnisse, Partitionen oder das komplette System"\\n\
+"|- anzeigen. Die Daten können unterschiedlich ausführlich ausgegeben werden und"\\n\
+"|- automatisch gespeichert werden."\\n\
+"|-"\\n\
+"|- Standard:"\\n\
+"|- -Ohne Option:"\\n\
+"|-  Speicherbelegung anzeigen"\\n\
+"|- -Ohne Pfad bzw. ohne Suchbegriff:"\\n\
+"|-  Aktuelles Arbeitsverzeichnis wird als Pfad genutzt und der Suchbegriff bleibt leer."\\n\
+"|-"
+
+# -Die Optionen, Befehle und Infotexte für die Hilfe aus den Arrays auslesen:
+typeset -i intFELD=0
+txtHILFEoptionen=""
+for txtARRoption in ${arrOPTIONEN[@]}
+do
+    # -Die restlichen Texte aus Array zuweisen:
+    txtARRbefehl=${arrBEFEHLE[$intFELD]}
+    txtARRinfo=${arrOPTIONENtxtINFO[$intFELD]}
+    txtHILFEoptionen=$txtHILFEoptionen"|- $txtARRoption\\t$txtARRinfo\\n|-\\tBefehl: \"$txtARRbefehl\"\\n"
+    intFELD=intFELD+1
+done
+txtHILFE=$txtBENUTZUNG\\n\
+"|- Optionen:"\\n\
+"|- -h\\tDiesen Hilfetext anzeigen."\\n\
+$txtHILFEoptionen\
+"|-"
+
+txtFEHLERargument=\\n\
+"|- FEHLER:\\tKein zulässiges Argument übergeben. - Es könnte Panik entstehen!"\\n\
+"|-\\t\\tWeitere Hilfe erhalten Sie mit '-h'!"\\n\
+"|-"
+
+txtENDEzeit=\\n\
+"|-"\\n\
+"|- Start:\t$zeitSTART"\\n\
+"|- Ende:\t"
+
+
+
+echo -e $txtKOPF
+
+
+# -Hilfe anzeigen:
+if ( [[ "$1" == "-h" ]] )
+then
+    echo -e "$txtHILFE"
+    exit 0;
+fi
+
+
+
+
+
+
+
+# -Ausgabe der Befehle:
+#echo -e "|- Pfad: $pfad"
+echo -e "|- Befehl: $txtBEFEHL"
+echo -e "$strBEFEHL"
+
+exit 0;
+
+
+
+
+
+
+
+
+
+
+eingabeQUELLEkomplett=""
+eingabeQUELLEbak="/"
+
+# *****************************************************************************
+# ***** START Eingabe Quellen Datei *******************************************
+# -Quelle auswählen:
+if ( [[ "$eingabeQUELLE" == "" ]] )
+then
+    eingabeQUELLE=$(kdialog --title="Quelldatei(en) wählen:" --getopenfilename $eingabeQUELLEbak --multiple 2>/dev/null)
+    #eingabeQUELLE=$(kdialog --title="Quelle wählen:" --getopenfilename "/" --multiple)
+    checkDIALOG=$(echo -e "$?")
+else
+    checkDIALOG="0"
+fi
+checkDIALOGfehler=""
+# -Case für Fensterüberwachung:
+case "$checkDIALOG" in
+    (0)
+        # -Case für Eingabeüberwachung:
+#         case "$eingabeQUELLE" in
+#             ( http://???* )
+#                 checkDIALOGfehler="" ;;
+#             ( https://???* )
+#                 checkDIALOGfehler="" ;;
+#             ( url:?? )
+#                 checkDIALOGfehler="" ;;
+#             (*)
+#                 checkDIALOGfehler="|- FEHLER:\\n|- Sie haben keine gültige URL eingegeben! Das Skript wird daher beendet." ;;
+#         esac ;;
+        checkDIALOGfehler="" ;;
+    (1)
+        # -abbruchBENUTZER
+        flagDIALOGfehler="DATEI"
+        checkDIALOGfehler="|- Sie haben die Auswahl der Quelldatei(en) abgebrochen. Das Skript startet"\\n\
+        "|- jetzt die Quellverzeichnis Auswahl." ;;
+    (*)
+        # -abbruchFEHLER
+        checkDIALOGfehler="|- FEHLER:"\\n\
+"|- Ihre Eingabe konnte nicht gespeichert werden, da der Fensterprozess beendet"\\n\
+"|- wurde. Entweder gab es einen internen Fehler oder ein anderer Benutzer/Prozess"\\n\
+"|- hat das Programm geschlossen. Bitte starten Sie $datei neu!"\\n\
+"|-"\\n\
+"|- Um nähere Informationen zu erhalten, sollten Sie ihre Logdateien kontrollieren"\\n\
+"|- und die Ausgabe in der Konsole beachten." ;;
+esac
+# -Fehlerausgabe und Skript beenden:
+if ( [[ "$checkDIALOGfehler" != "" ]] )
+then
+    # -Fehlermeldung ausgeben und Skript beenden:
+    if ( [[ "$eingabeQUELLE" != "" ]] )
+    then
+        echo -e "|- Ihre Eingabe:\\t$eingabeQUELLE"
+    fi
+    echo -e $checkDIALOGfehler
+    echo -e "|-"
+    # -Abbrechen oder weiter zum nächsten Schritt:
+    if ( [[ "$checkDIALOG" != "1" ]] )
+    then
+        exit 2;
+    fi
+else
+    txtINFOeingabeQUELLE="|- -$intZ. Quelle:\\t$eingabeQUELLE"
+    echo -e $txtINFOeingabeQUELLE
+fi
+
+# -Quellen zusammenbauen:
+eingabeQUELLEkomplett=$eingabeQUELLEkomplett$eingabeQUELLE" "
+eingabeQUELLEbak=$eingabeQUELLE
+eingabeQUELLE=""
+# ***** ENDE Eingabe Quellen Datei ********************************************
+# *****************************************************************************
+
+
+
+
+
+# *****************************************************************************
+# ***** START Eingabe Quellen Verzeichnis *************************************
+while ( [[ "$intANZAHLquellen" -gt 0 ]] )
+do
+    intANZAHLquellen=intANZAHLquellen-1
+    intZ=intZ+1
+
+    # -Quelle auswählen:
+    if ( [[ "$eingabeQUELLE" == "" ]] )
+    then
+        eingabeQUELLE=$(kdialog --title="$intZ. Quelle wählen:" --getexistingdirectory $eingabeQUELLEbak 2>/dev/null)
+        #eingabeQUELLE=$(kdialog --title="Quelle wählen:" --getopenfilename "/" --multiple)
+        checkDIALOG=$(echo -e "$?")
+    else
+        checkDIALOG="0"
+    fi
+    checkDIALOGfehler=""
+    # -Case für Fensterüberwachung:
+    case "$checkDIALOG" in
+        (0)
+            # -Case für Eingabeüberwachung:
+    #         case "$eingabeQUELLE" in
+    #             ( http://???* )
+    #                 checkDIALOGfehler="" ;;
+    #             ( https://???* )
+    #                 checkDIALOGfehler="" ;;
+    #             ( url:?? )
+    #                 checkDIALOGfehler="" ;;
+    #             (*)
+    #                 checkDIALOGfehler="|- FEHLER:\\n|- Sie haben keine gültige URL eingegeben! Das Skript wird daher beendet." ;;
+    #         esac ;;
+            intANZAHLquellen=1
+            checkDIALOGfehler="" ;;
+        (1)
+            # -abbruchBENUTZER
+            if ( [[ "$flagDIALOGfehler" == "DATEI" ]] )
+            then
+                checkDIALOGfehler="|- Sie haben die Auswahl des Quellverzeichnis abgebrochen. Da auch keine"\\n\
+                "|- Quelldatei gewählt wurde, wird das Skript beendet."
+                flagDIALOGfehler=$flagDIALOGfehler"aaVERZEICHNIS"
+            else
+                checkDIALOGfehler="|- Sie haben die Auswahl des Quellverzeichnis abgebrochen. Die gewählten"\\n\
+                "|- Quelldateien werden zum Kopieren vorbereitet."
+            fi ;;
+        (*)
+            # -abbruchFEHLER
+            checkDIALOGfehler="|- FEHLER:"\\n\
+    "|- Ihre Eingabe konnte nicht gespeichert werden, da der Fensterprozess beendet"\\n\
+    "|- wurde. Entweder gab es einen internen Fehler oder ein anderer Benutzer/Prozess"\\n\
+    "|- hat das Programm geschlossen. Bitte starten Sie $datei neu!"\\n\
+    "|-"\\n\
+    "|- Um nähere Informationen zu erhalten, sollten Sie ihre Logdateien kontrollieren"\\n\
+    "|- und die Ausgabe in der Konsole beachten." ;;
+    esac
+    # -Fehlerausgabe und Skript beenden:
+    if ( [[ "$checkDIALOGfehler" != "" ]] )
+    then
+        # -Fehlermeldung ausgeben und Skript beenden:
+        if ( [[ "$eingabeQUELLE" != "" ]] )
+        then
+            echo -e "|- Ihre Eingabe:\\t$eingabeQUELLE"
+        fi
+        echo -e $checkDIALOGfehler
+        echo -e "|-"
+        # -Abbrechen oder weiter zum nächsten Schritt:
+        if ( [[ "$checkDIALOG" != "1" ]] )
+        then
+            exit 2;
+        fi
+    else
+        txtINFOeingabeQUELLE="|- -$intZ. Quelle:\\t$eingabeQUELLE"
+        echo -e $txtINFOeingabeQUELLE
+    fi
+
+    # -Quellen zusammenbauen:
+    eingabeQUELLEkomplett=$eingabeQUELLEkomplett$eingabeQUELLE" "
+    eingabeQUELLEbak=$eingabeQUELLE
+    eingabeQUELLE=""
+
+done
+# ***** ENDE Eingabe Quellen Verzeichnis **************************************
+# *****************************************************************************
+
+
+
+
+txtQUELLEN=$eingabeQUELLEkomplett
+echo -e "|-"
+du -hsc $eingabeQUELLEkomplett
+echo -e "|-"
+
+
+
+# -Ziel auswählen:
+if ( [[ "$eingabeZIEL" == "" ]] )
+then
+    eingabeZIEL=$(kdialog --title="Ziel wählen:" --getexistingdirectory "/" 2>/dev/null)
+    checkDIALOG=$(echo -e "$?")
+else
+    checkDIALOG="0"
+fi
+checkDIALOGfehler=""
+# -Case für Fensterüberwachung:
+case "$checkDIALOG" in
+    (0)
+        # -Case für Eingabeüberwachung:
+#         case "$eingabeZIEL" in
+#             ( http://???* )
+#                 checkDIALOGfehler="" ;;
+#             ( https://???* )
+#                 checkDIALOGfehler="" ;;
+#             ( url:?? )
+#                 checkDIALOGfehler="" ;;
+#             (*)
+#                 checkDIALOGfehler="|- FEHLER:\\n|- Sie haben keine gültige URL eingegeben! Das Skript wird daher beendet." ;;
+#         esac ;;
+        checkDIALOGfehler="" ;;
+    (1)
+        # -abbruchBENUTZER
+        checkDIALOGfehler="|- Sie haben die Eingabe abgebrochen. Das Skript wird daher beendet." ;;
+    (*)
+        # -abbruchFEHLER
+        checkDIALOGfehler="|- FEHLER:"\\n\
+"|- Ihre Eingabe konnte nicht gespeichert werden, da der Fensterprozess beendet"\\n\
+"|- wurde. Entweder gab es einen internen Fehler oder ein anderer Benutzer/Prozess"\\n\
+"|- hat das Programm geschlossen. Bitte starten Sie $datei neu!"\\n\
+"|-"\\n\
+"|- Um nähere Informationen zu erhalten, sollten Sie ihre Logdateien kontrollieren"\\n\
+"|- und die Ausgabe in der Konsole beachten." ;;
+esac
+# -Fehlerausgabe und Skript beenden:
+if ( [[ "$checkDIALOGfehler" != "" ]] )
+then
+    # -Fehlermeldung ausgeben und Skript beenden:
+    if ( [[ "$eingabeZIEL" != "" ]] )
+    then
+        echo -e "|- Ihre Eingabe:\\t$eingabeZIEL"
+    fi
+    echo -e $checkDIALOGfehler
+    echo -e "|-"
+    exit 1;
+else
+    txtINFOeingabeZIEL="|- -Ziel:\\t$eingabeZIEL"
+    echo -e $txtINFOeingabeZIEL
+fi
+
+
+
+
+
+
+
+#echo -e "|- cp -ru $eingabeQUELLEkomplett $eingabeZIEL/"
+echo -e "|-"
+echo -e "|- Vorgang wurde gestartet..."
+
+cp -ru $eingabeQUELLEkomplett $eingabeZIEL/
+
+#echo -e "|-"
+echo -en "|- Vorgang erfolgreich abgeschlossen!"
+
+# -um Benutzer über die Ausführung/das Beenden des Skripts zu informieren:
+beep -l 200 -f 480 -D 40 --new -l 200 -f 520 -D 40 --new -l 350 -f 480 -D 100
+
+txtZEITSTEMPEL=`date '+%F %T:%N'`
+echo -e $txtENDEzeit$txtZEITSTEMPEL
+echo -e "|-"
+
+
+
+exit 0;
+
+
+
+
+
+
+
+
+
+
+
+# SHORTCUT
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# +++++ START function $datei.conf auslesen ++++++++++++++++++++++++++++
+function fncDATEIconfAUSLESEN {
+    # -Wenn der richtige Schlüssel gefunden wurde, wird der entsprechende
+    #  Wert ausgelesen und einer Variablen zugewiesen:
+    eingabeURLkontrolle=$eingabeURL
+    flagURLconf="false"
+    while read txtDATEIconf
+    do
+        #nix=1
+        if ( [[ "$txtDATEIconf" == url:$eingabeURL=* ]] )
+        then
+            eingabeURL=${txtDATEIconf//url:$eingabeURL=/}
+            flagURLconf="true"
+            break
+        fi
+    done < /home/$nutzer/bin/$datei.conf
+}
+# +++++ ENDE function $datei.conf auslesen ++++++++++++++++++++++++++++
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+
+
+# +++++ START Config auslesen
+while read txtCONFIG
+do
+    #nix=1
+    if ( [[ "$txtCONFIG" == --download-archiv* ]] )
+    then
+        archivORIGINAL=${txtCONFIG//\-\-download\-archiv /}
+        #echo $archivORIGINAL
+        break
+    fi
+done < ~/.config/youtube-dl/config
+# +++++ ENDE Config auslesen
+
+strg1="-"
+strg2="-"
+strg3="-"
+# -Die Argumente kontrollieren und neu aufteilen:
+# --ALLE normalen Optionen (-q,-h,...) werden im $strg1 gespeichert
+# --die Shutdown Optionen (-off...) werden im $strg2 gespeichert
+for i in $*
+do
+    if ( [[ "$i" == -*f* ]] && [[ "$i" != -off* ]] && [[ "$i" != -url* ]] )
+    then
+        strg1=$strg1"f"
+        #echo -e "|- \"$i\" * einzel Vergleich: -f gesetzt"
+    fi
+    if ( [[ "$i" == -*h* ]] && [[ "$i" != -url* ]] )
+    then
+        strg1=$strg1"h"
+    fi
+    if ( [[ "$i" == -*l* ]] && [[ "$i" != -url* ]] )
+    then
+        strg1=$strg1"l"
+    fi
+    if ( [[ "$i" == -*q* ]] )
+    then
+        strg1=$strg1"q"
+    fi
+    if ( [[ "$i" == -*qq* ]] )
+    then
+        strg1=$strg1"q"
+    fi
+    if ( [[ "$i" == -*qqq* ]] )
+    then
+        strg1=$strg1"q"
+    fi
+    if ( [[ "$i" == "-off" ]] )
+    then
+        strg2=$strg2"off"
+        #echo -e "|- \"$i\" * einzel Vergleich: -off gesetzt"
+    elif ( [[ "$i" == -off=* ]] )
+    then
+        #echo -e "|- \"$i\" * einzel Vergleich: -off=* gesetzt"
+        intOFFminuten=${i//*=/}
+        #echo -e "|- \"$intOFFminuten\" * einzel Vergleich: intOFFminuten"
+        strg2=$strg2"off="$intOFFminuten
+    elif ( [[ "$i" == -off* ]] )
+    then
+        #echo -e "|- \"$i\" * einzel Vergleich: FEHLER -off* gesetzt"
+        strg2=""
+    elif ( [[ "$i" != -* ]] )
+    then
+        #echo -e "|- \"$i\" * einzel Vergleich: FEHLER kein gültiges Argument"
+        flagFEHLERargument="true"
+    fi
+    if ( [[ "$i" == -url=* ]] )
+    then        
+        # -Prüfen ob Shortcut in der $datei.conf steht, falls nicht wird die Eingabe einfach
+        #  als URL übernommen!
+        #eingabeURL=${i//\-/}
+        eingabeURL=${i//\-url=/}
+        #echo -e "|- DEBUG-INFO:\\n|- eingabeURL: $eingabeURL"
+        if ( [[ "$eingabeURL" != *.* ]] )
+        then
+            fncDATEIconfAUSLESEN
+        fi
+        if ( [[ "$flagURLconf" != "true" ]] )
+        then
+            # -Eingabe ist normale URL:
+            eingabeURL=${i//\-url=/}
+            eingabeURL=${eingabeURL//\&/aaaUNDaaa}
+            if ( [[ "$eingabeURL" != http*:\/\/* ]] )
+            then
+                eingabeURL="http://"$eingabeURL
+                #echo -e "|- DEBUG-INFO:\\n|- eingabeURL: $eingabeURL"
+            fi
+            #eingabeURL=${eingabeURL//aaaUNDaaa/\&}
+        fi
+    fi
+    if ( [[ "$i" == http*:\/\/* ]] )
+    then
+        eingabeURL="$eingabeURL $i"
+        #echo -e "|- DEBUG-INFO:\\n|- eingabeURL mit i: $eingabeURL"
+    fi
+done
+
+
+# echo -e "|- DEBUG-INFO: Ausgabe der String Variablen:"
+# echo -e "|- DEBUG-INFO: *: $*"
+# echo -e "|- DEBUG-INFO: \$strg1: $strg1 --- \$strg2: $strg2"
+
+#echo -e "|- DEBUG-INFO:\\n|- eingabeURL: $eingabeURL\\n|- eingabeURLneu: ${eingabeURL//aaaUNDaaa/\&}"
+#exit 0;
+
+
+
+
+# -------------------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------
+# -Sonderfälle UPDATE, AUFRUF_INTERN, -q, -h, -l
+if ( [[ "$flag_update" != "true" ]] && [[ "$flag_aufruf_intern" != "true" ]] && [[ "$strg1" != -*q* ]] && [[ "$strg1" != -*h* ]] && [[ "$strg1" != -*l* ]] )
+then
+    # -Die Sicherheitsfrage:
+    # --1. Argument: die Vorbelegung: WEITER oder ABBRECHEN
+    # --2. Argument: die Datei die gestartet werden soll
+    # --3. Argument: der Titel der Datei die gestartet werden soll
+    flagSICHERHEITSFRAGE=`/home/lx21/bin/zz_inc_sicherheitsfrage.sh "WEITER" "$datei" "$txtTITEL"`
+    flagSICHERHEITSFRAGE=$?
+    # -Wenn der Rückgabewert nicht 0 ist, wurde entweder abgebrochen oder es gab einen Fehler!
+    if ( [[ "$flagSICHERHEITSFRAGE" != "0" ]] )
+    then
+        # -Die Sicherheitsfrage beendet das Skript!
+        #echo -e "--- Sicherheitsfrage: $flagSICHERHEITSFRAGE"
+        exit 0;
+    fi
+fi
+# -------------------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+# -Einbindung einer Verlauf Datei:
+# --im übergeordneten Ordner nach Verlauf suchen und wenn vorhanden einlesen
+# --Verlauf als Liste (radio oder check) zur URL Auswahl anbieten, wenn keine Auswahl
+#   erfolgt wird inputbox geöffnet, ansonsten geht es direkt zur Formatauswahl
+# --nach der URL Eingabe diese im Verlauf speichern
+# # +++++ START Config auslesen
+# while read txtCONFIG
+# do
+#     #nix=1
+#     if ( [[ "$txtCONFIG" == --download-archiv* ]] )
+#     then
+#         archivORIGINAL=${txtCONFIG//\-\-download\-archiv /}
+#         #echo $archivORIGINAL
+#         break
+#     fi
+# done < ~/.config/youtube-dl/config
+# # +++++ ENDE Config auslesen
+# 
+# # +++++ START archivTMP anhängen an archivORIGINAL
+# while read txtTMP
+# do
+#     echo $txtTMP >> $archivORIGINAL
+# done < $archivTMP
+# # +++++ ENDE archivTMP anhängen an archivORIGINAL
+
+
+
+
+
+
+
+
+
+
+
+# -Die Hilfe anzeigen:
+if ( [[ "$strg1" == -*h* ]] )
+then
+    echo -e $txtKOPF
+    echo -e $txtHILFE
+    exit 0;
+fi
+
+# -Die Logdatei anzeigen:
+if ( [[ "$strg1" == -*l* ]] )
+then
+    cat $dateiLOGS
+    echo -e \\n$txtHR
+    exit 0;
+fi
+
+
+echo -e $txtKOPF
+
+
+txtINFOeingabeBEFEHL="|- -Eingabe Befehl:\\t$datei $*"
+echo -e $txtINFOeingabeBEFEHL
+
+
+eingabeURLgespeichert=""
+txtFEHLERalteURLSgefunden=""
+
+if ( [[ -f "$dateiURLS" ]] )
+then
+    while read eingabeURLgespeichert
+    do
+        nix=0
+#         echo -e "|--- $eingabeURLgespeichert"
+#         echo -e "|- Eine Sicherung ('$dateiURLS') der zuletzt verwendeten URLs wurde gefunden!"
+#         echo -e "|- Anscheinend konnten die letzten Downloads nicht ordnungsgemäß beendet werden."
+#         echo -e "|- Falls Sie sich nicht sicher sind ob alle Downloads fehlerfrei abgeschlossen wurden,"
+#         echo -e "|- lassen Sie einfach das Skript mit den alten URLs noch einmal laufen. Dabei werden"
+#         echo -e "|- keine Dateien doppelt heruntergeladen!"
+#         echo -e "|-"
+        txtFEHLERalteURLSgefunden="<hr><b>INFO:</b><br>Eine Sicherung der zuletzt verwendeten URLs wurde gefunden! Anscheinend konnten die letzten Downloads nicht ordnungsgemäß beendet werden.<br>Falls Sie sich nicht sicher sind ob alle Downloads fehlerfrei abgeschlossen wurden, lassen Sie einfach das Skript mit den alten URLs noch einmal laufen. Dabei werden keine Dateien doppelt heruntergeladen!<hr>"
+        if ( [[ "$eingabeURLgespeichert" != "" ]] )
+        then
+            break;
+        fi
+    done < $dateiURLS
+fi
+
+
+if ( [[ "$eingabeURL" == "" ]] )
+then
+    # eingabeURL=$(kdialog --title="URL eingeben!" --inputbox "<hr><b style='align:middle;font-size:bigger'>$datei</b><hr><br>Bitte geben Sie die URLs der Dateien an, die das Skript herunterladen soll. Bei manchen Anbietern kann auch eine komplette Playliste angegeben werden.<br><br>Der WGET Befehl erwartet eine URL zu einem Verzeichnis mit Index Datei oder zu einer gültigen HTML Datei<br><br>Mehrere URLs müssen immer durch Leerzeichen getrennt werden!<br>$txtFEHLERalteURLSgefunden" "$eingabeURLgespeichert" --geometry=400x400)
+    eingabeURL=$(kdialog --title="URL eingeben!" --inputbox "<h3><center>$datei</center></h3><br>Bitte geben Sie die URLs der Dateien an, die das Skript herunterladen soll. Bei manchen Anbietern kann auch eine komplette Playliste angegeben werden.<br><br>Der WGET Befehl erwartet eine URL zu einem Verzeichnis mit Index Datei oder zu einer gültigen HTML Datei<br><br>Mehrere URLs müssen immer durch Leerzeichen getrennt werden!<br>$txtFEHLERalteURLSgefunden" "$eingabeURLgespeichert" --geometry=600x500)
+    checkDIALOG=$(echo -e "$?")
+else
+    checkDIALOG="0"
+fi
+    checkDIALOGfehler=""
+    # -Case für Fensterüberwachung:
+    case "$checkDIALOG" in
+        (0)
+            # -Case für Eingabeüberwachung:
+            case "$eingabeURL" in
+                ( http://???* )
+                    checkDIALOGfehler="" ;;
+                ( https://???* )
+                    checkDIALOGfehler="" ;;
+                ( url:?? )
+                    checkDIALOGfehler="" ;;
+                (*)
+                    checkDIALOGfehler="|- FEHLER:\\n|- Sie haben keine gültige URL eingegeben! Das Skript wird daher beendet." ;;
+            esac ;;
+        (1)
+            # -abbruchBENUTZER
+            checkDIALOGfehler="|- Sie haben die Eingabe abgebrochen. Das Skript wird daher beendet." ;;
+        (*)
+            # -abbruchFEHLER
+            checkDIALOGfehler="|- FEHLER:"\\n\
+    "|- Ihre Eingabe konnte nicht gespeichert werden, da der Fensterprozess beendet"\\n\
+    "|- wurde. Entweder gab es einen internen Fehler oder ein anderer Benutzer/Prozess"\\n\
+    "|- hat das Programm geschlossen. Bitte starten Sie $datei neu!"\\n\
+    "|-"\\n\
+    "|- Um nähere Informationen zu erhalten, sollten Sie ihre Logdateien kontrollieren"\\n\
+    "|- und die Ausgabe in der Konsole beachten." ;;
+    esac
+    # -Fehlerausgabe und Skript beenden:
+    if ( [[ "$checkDIALOGfehler" != "" ]] )
+    then
+        # -Fehlermeldung ausgeben und Skript beenden:
+        if ( [[ "$eingabeURL" != "" ]] )
+        then
+            echo -e "|- Ihre Eingabe:\\t$eingabeURL"
+        fi
+        echo -e $checkDIALOGfehler
+        echo -e "|-"
+        exit 1;
+    else
+        txtINFOeingabeURL="|- -Eingabe URL:\\t$eingabeURL"
+        echo -e $txtINFOeingabeURL
+    fi
+    # -die URL Eingabe wird in einer datei gesichert! $dateiURLS
+    # --wenn das Skript mit einem Fehler abgebrochen wird, müssen die URLs also nicht noch einmal eingegeben werden
+    # --wenn das Skript korrekt beendet wird kann die datei gelöscht werden, allerdings solte die Logdatei noch kontrolliert
+    #   werden... (grep "error")
+
+echo -e "$eingabeURL" > $dateiURLS
+
+
+
+
+# -------------------------------------------------------------------------------------------------------
+# ----- START Force Option abfragen -----------------------------------------------------------
+# -das $flagFORCE ersetzt -f
+flagFORCE="false"
+if ( [[ "$strg1" != -*qq* ]] )
+then
+    # -falls -f schon beim Befehlsaufruf gesetzt wurde, wird diese Abfrage übersprungen
+    if ( [[ "$strg1" != -*f* ]] )
+    then
+        kdialog --title="Force Download?" --warningcontinuecancel=\
+        "Um einen erneuten Download zu erzwingen, kann die Force Option<br>\
+        gesetzt werden. (\"-f\" beim Aufruf in der Konsole)<br><br>\
+        Die IDs der bereits heruntergeladenen Videodateien werden gespeichert<br>\
+        um keine Datei doppelt herunterzuladen. Wenn die Datei jedoch erneut<br>\
+        oder in einem neuen Format gespeichert werden soll, MUSS die<br>\
+        Force Option gesetzt werden.<br><br><br>\
+        Möchten Sie die Force Download Option einschalten?"\
+        --continue-label="Weiter, OHNE Force Download." --cancel-label="Weiter, MIT Force Download."
+
+        flagFRAGE=$(echo -e "$?")
+        if [[ "$flagFRAGE" == "2" ]]
+        then
+            # -Abbrechen wurde gewählt:
+            flagFORCE="true"
+        else
+            # -Weiter wurde gewählt:
+            nix=1
+        fi
+    else
+        # -f wurde beim Befehlsaufruf gesetzt
+        flagFORCE="true"
+    fi
+fi
+# ----- ENDE Force Option abfragen ------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------
+
+
+
+
+if ( [[ "$strg1" != -*qqq* ]] )
+then
+    # Formatauswahl wird nicht unterdrückt:
+    auswahlACTION=$(kdialog --title="Format auswählen!" --radiolist="== $datei ================<br><br>\
+    Bitte wählen Sie in welchen Formaten die Daten gespeichert werden sollen.<hr><br>\
+    Bei Audiodateien wird automatisch das Video Thumbnail als Cover in der<br>\
+    mp3 Datei gespeichert! Nur wenn das Thumbnail zusätzlich als eigenständige<br>\
+    Grafikdatei abgespeichert werden soll, wählen Sie eine der Optionen mit \"Thumbnail\".<br>Standard: \"Nur Video\"<hr><br>Dateiformate auswählen:<br>" \
+    "Nur Video" "Nur Video (mp4)" on \
+    "Nur Audio" "Nur Audio (mp3)" off \
+    "Audio und Thumbnail" "Audio und Thumbnail (mp3, jpg)" off \
+    "Video und Audio" "Video und Audio (mp4, mp3)" off \
+    "Video, Audio und Thumbnail" "Video, Audio und Thumbnail (mp4, mp3, jpg)" off \
+    "HTML-Seiten" "HTML-Seiten (html, jpg)" off)
+    #actionGRAFIK "Nur Grafik (wget)" off  --geometry="600x400")
+    checkDIALOG=$(echo -e "$?")
+    checkDIALOGfehler=""
+    # -Case für Fensterüberwachung:
+    case "$checkDIALOG" in
+        (0)
+            # -Case für Eingabeüberwachung:
+            case "$auswahlACTION" in
+                ("Nur Video")
+                    actionBEFEHL="youtube-dl -i" ;;
+                ("Nur Audio")
+                    actionBEFEHL="youtube-dl -i -x --audio-format mp3 --audio-quality 0 --embed-thumbnail" ;;
+                ("Audio und Thumbnail")
+                    actionBEFEHL="youtube-dl -i -x --audio-format mp3 --audio-quality 0 --embed-thumbnail --write-thumbnail" ;;
+                ("Video und Audio")
+                    actionBEFEHL="youtube-dl -i -x -k --audio-format mp3 --audio-quality 0 --embed-thumbnail" ;;
+                ("Video, Audio und Thumbnail")
+                    actionBEFEHL="youtube-dl -i -x -k --audio-format mp3 --audio-quality 0 --embed-thumbnail --write-thumbnail" ;;
+                ("HTML-Seiten")
+                    actionBEFEHL="wget -np -r -l inf -k -E" ;;
+                (*)
+                    checkDIALOGfehler="|- FEHLER:\\n|- Die Formatauswahl hat keine Daten übermittelt! Bitte erneut auswählen." ;;
+            esac ;;
+        (1)
+            # -abbruchBENUTZER
+            checkDIALOGfehler="|- Sie haben die Eingabe abgebrochen. Das Skript wird daher beendet." ;;
+        (*)
+            # -abbruchFEHLER
+            checkDIALOGfehler="|- FEHLER:"\\n\
+    "|- Ihre Eingabe konnte nicht gespeichert werden, da der Fensterprozess beendet"\\n\
+    "|- wurde. Entweder gab es einen internen Fehler oder ein anderer Benutzer/Prozess"\\n\
+    "|- hat das Programm geschlossen. Bitte starten Sie $datei neu!"\\n\
+    "|-"\\n\
+    "|- Um nähere Informationen zu erhalten, sollten Sie ihre Logdateien kontrollieren"\\n\
+    "|- und die Ausgabe in der Konsole beachten." ;;
+    esac
+    # -Fehlerausgabe und Skript beenden:
+    if ( [[ "$checkDIALOGfehler" != "" ]] )
+    then
+        # -Fehlermeldung ausgeben und Skript beenden:
+        echo -e $checkDIALOGfehler
+        echo -e "|-"
+        exit 0;
+    else
+        txtINFOauswahlACTION="|- -Ausgabe Formate:\\t$auswahlACTION"
+        echo -e $txtINFOauswahlACTION
+    fi
+else
+    # -qqq wurde gesetzt, daher müssen die Standard Werte geladen werden!
+    actionBEFEHL="youtube-dl -i"
+    auswahlACTION="Nur Video"
+    txtINFOauswahlACTION="|- -Ausgabe Formate:\\t$auswahlACTION"
+    echo -e $txtINFOauswahlACTION
+fi
+
+
+
+# -Dateiinfos in die Logdatei schreiben:
+echo -e $txtKOPFlogs > $dateiLOGS
+echo -e $txtINFOeingabeBEFEHL >> $dateiLOGS
+echo -e $txtINFOeingabeURL >> $dateiLOGS
+echo -e $txtINFOauswahlACTION >> $dateiLOGS
+
+
+
+
+# -die Force Download Option einbinden:
+#  wenn die Datei bereits heruntergeladen wurde, existiert ein Eintrag im youtube-dl Archiv. um den erneuten Download
+#  zu erzwingen wird ein temporäres Archiv benutzt, damit neue Download Einträge auch im Original-Archiv gespeichert
+#  werden, wird der Inhalt des archivTMP an das Original-Archiv kopiert. Das archivTMP wird danach wieder gelöscht.
+archivTMP="ytdl-archive.tmp"
+if ( [[ "$flagFORCE" == "true" ]] )
+then
+    actionBEFEHL=$actionBEFEHL" --download-archive $archivTMP"
+fi
+
+# -Umleitung der Ausgabe in die Logdatei:
+umleitungLOGDATEI=">> $dateiLOGS 2>> $dateiLOGS"
+
+# -Anzeige des Befehls und Befehl in Logdatei schreiben:
+#txtINFObefehl="|- -Der interne Aufruf:"\\n"|-  $actionBEFEHL $eingabeURL $umleitungLOGDATEI"\\n"|-"
+txtINFObefehl="|- -Befehl youtube-dl:\\t$actionBEFEHL http... $umleitungLOGDATEI"\\n"|-"
+echo -e $txtINFObefehl
+echo -e $txtINFObefehl >> $dateiLOGS
+
+
+
+# -Ausgabe der Force Download Option:
+if ( [[ "$flagFORCE" == "true" ]] )
+then
+    txtINFOforceDOWNLOAD="|- -Force Download ist eingeschaltet!"
+else
+    txtINFOforceDOWNLOAD=""
+fi
+# -Ausgabe der Shutdown Option:
+if ( [[ "$strg2" == "-off" ]] )
+then
+    txtINFOshutdown="|- -Nach erfolgreichem Beenden wird das System abgeschaltet! Wartezeit: 1 min"\\n"|-"
+    intOFFminuten=1
+elif ( [[ "$strg2" == -off=* ]] )
+then
+    txtINFOshutdown="|- -Nach erfolgreichem Beenden wird das System abgeschaltet! Wartezeit: $intOFFminuten min"\\n"|-"
+elif ( [[ "$strg2" == "-" ]] || [[ "$strg2" == "" ]] )
+then
+    txtINFOshutdown=""
+    intOFFminuten=""
+fi
+# -Zusatzinfos (Force und Shutdown Option) in Logdatei schreiben:
+if ( [[ "$txtINFOforceDOWNLOAD" != "" ]] )
+then
+    echo -e $txtINFOforceDOWNLOAD
+    echo -e $txtINFOforceDOWNLOAD >> $dateiLOGS
+fi
+if ( [[ "$txtINFOshutdown" != "" ]] )
+then
+    echo -e $txtINFOshutdown
+    echo -e $txtINFOshutdown >> $dateiLOGS
+fi
+
+
+
+#checkBEFEHL="echo -e $actionBEFEHL $eingabeURL"
+checkBEFEHL="echo -e $actionBEFEHL $eingabeURL"
+#echo -e "*** DEBUG: checkBEFEHL"\\n"*** "$checkBEFEHL" "$umleitungLOGDATEI
+#echo -e "*** DEBUG: checkBEFEHL"
+#echo -e "*** "$checkBEFEHL" "$umleitungLOGDATEI
+`$checkBEFEHL` >> $dateiLOGS 2>> $dateiLOGS &
+checkBEFEHLreturn=$?
+checkBEFEHLpid=$!
+
+
+
+
+
+function MOVEasciiKREISEL {
+    asciiKREISEL[0]="-"
+    asciiKREISEL[1]="\\"
+    asciiKREISEL[2]="|"
+    asciiKREISEL[3]="/"
+    tput cup $cursorZEILEkreisel 38
+    echo -n "${asciiKREISEL[0]}"
+    actionKONTROLLE="start"
+    intUTCsekunden=`date '+%s'`
+    intUTCreloadSTATUS=`echo -e "$intUTCsekunden + 2" | bc`
+    while ( [[ "$actionKONTROLLE" == "start" ]] )
+    do
+        intUTCsekunden=`date '+%s'`
+        if ( [[ "$intUTCsekunden" -ge "$intUTCreloadSTATUS" ]] && [[ "$intUTCsekunden" == *0 ]] )
+        then
+            fncSTATUSauslesen
+            intUTCreloadSTATUS=`echo -e "$intUTCsekunden + 10" | bc`
+        fi
+        for i in "${asciiKREISEL[@]}"
+        do
+            tput cup $cursorZEILEkreisel 38
+            echo -ne "\b$i"
+            sleep 0.1
+        done
+        if ( [[ `ps -p $checkBEFEHLpid | grep $checkBEFEHLpid` == "" ]] )
+        then
+            #fg %
+            # -Das Quit-Flag-PS in TMP Datei schreiben:
+            echo -e "flagQUITps" > "$datei.$$.cache.tmp"
+            eingabeTASTE="e"
+            actionKONTROLLE="stop"
+            #beep -l 25 -f 466.2 -D 100 --new -l 25 -f 466.2 -D 100 --new -l 250 -f 466.2 -D 100
+            break
+        fi
+        if ( [[ "$actionKONTROLLE" == "stop" ]] )
+        then
+            break
+        fi
+    done
+}
+
+function CHECKeingabeTASTE {
+    if ( [[ "$eingabeTASTE" != "e" ]] )
+    then
+        eingabeTASTE=""
+        flagQUIT=""
+        #stty raw echo
+        #while ( [[ "$eingabeTASTE" != "q" ]] )
+        #while ( [[ `dd bs=1 count=1 2>/dev/null` != "q" ]] && [[ `read "$datei.$$.cache.tmp"` != "flagQUITps" ]] )
+        while ( [[ "$eingabeTASTE" != "q" ]] && [[ `cat $datei.$$.cache.tmp` != "flagQUITps" ]] )
+        do
+            #eingabeTASTE=`dd bs=1 count=1 2>/dev/null`
+            #tput cup $cursorZEILEkreisel 39
+            read -n 1 -t 1 -s eingabeTASTE
+            #tput cub 1
+            #echo -n " "
+            #tput cub 1
+            #beep -l 350 -f 392 -D 100 --new -l 250 -f 311.1 -D 100
+        done
+        #stty -raw echo
+        if ( [[ "$eingabeTASTE" == "q" ]] && [[ `cat $datei.$$.cache.tmp` != "flagQUITps" ]] )
+        then
+            flagQUIT="TRUEq"
+        fi
+        if ( [[ "$eingabeTASTE" != "q" ]] && [[ `cat $datei.$$.cache.tmp` == "flagQUITps" ]] )
+        then
+            flagQUIT="TRUEps"
+        fi
+        if ( [[ "$eingabeTASTE" == "q" ]] && [[ `cat $datei.$$.cache.tmp` == "flagQUITps" ]] )
+        then
+            flagQUIT="TRUEqTRUEps"
+        fi
+    fi
+    # -zur Aktualisierung des Status
+    #fncSTATUSauslesen
+}
+
+function CHECKeingabeTASTEeinmal {
+    if ( [[ "$eingabeTASTE" != "e" ]] )
+    then
+        eingabeTASTE=""
+        stty raw echo
+        eingabeTASTE=`dd bs=1 count=1 2>/dev/null`
+        # if ( [[ "$eingabeTASTE" != "q" ]] )
+        # then
+        #     tput cub 1
+        #     echo -n "   "
+        #     tput cub 3
+        # fi
+        stty -raw echo
+    fi
+}
+
+
+
+
+
+
+
+
+
+
+
+
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# +++++ START Status aus Logdatei anzeigen +++++++++++++++++++++++++++++++++++
+echo -e "|-\\n|- Status der Programmausführung:"
+txtZEIT="["`date '+%T'`"]"
+txtSTATUSausgabe="Warte auf Daten..."
+txtPLAYLIST=""
+echo -e "|- ${fmtFETT}$txtZEIT $txtSTATUSausgabe${fmtRESET}"
+echo -e "|- ${fmtFETT}$txtZEIT $txtSTATUSausgabe${fmtRESET}"
+echo -e "|- ${fmtFETT}$txtZEIT $txtSTATUSausgabe${fmtRESET}"
+if ( [[ "$txtPLAYLIST" != "" ]] )
+then
+    #echo -e "|- Playlist Infos: $txtPLAYLIST\\n|-"
+    echo -e "|- IBearbeitet wird: $txtPLAYLIST\\n|-"
+else
+    echo -e "|- Aktuelle Datei wird ermittelt:\\n|-"
+fi
+
+function fncCURSORposition {
+    # -Zum Prüfen ob das Gesamtskript noch läuft: flagQUITps existiert nicht in  $datei.$$.cache.tmp
+    # -positionieren: tput cup Zeile Spalte
+    typeset -i cursorZEILE=0
+    typeset -i cursorZEILEstatus=0
+    function getCPos { 
+        local v=() t=$(stty -g)
+        stty -echo
+        printf "\033[6n"
+        IFS='[;' read -ra v -d R
+        stty $t
+        CPos=(${v[@]:1})
+    }
+    getCPos
+    cursorZEILE=$CPos
+    zeileDELETE=`tput dl1`
+    zeileINSERT=`tput il1`
+    cursorZEILEstatus=$cursorZEILE-2
+    while ( [[ "$actionKONTROLLE" != "stop" ]] )
+    do
+        sleep 10
+        while read txtSTATUS
+        do
+            txtSTATUSausgabe=$txtSTATUS
+        done < $dateiLOGS
+        tput cup $cursorZEILEstatus 0
+        echo $zeileDELETE
+        tput cup $cursorZEILEstatus 0
+        echo -e "|- ${fmtFETT}\"$txtSTATUSausgabe\"${fmtRESET}"
+    done
+}
+
+
+# -positionieren: tput cup Zeile Spalte
+typeset -i cursorZEILE=0
+typeset -i intANZAHLstatusZEILEN=0
+typeset -i cursorZEILEstatus=0
+typeset -i cursorZEILEkreisel=0
+function getCPos { 
+    local v=() t=$(stty -g)
+    stty -echo
+    printf "\033[6n"
+    IFS='[;' read -ra v -d R
+    stty $t
+    CPos=(${v[@]:1})
+}
+getCPos
+cursorZEILE=$CPos
+zeileDELETE=`tput dl1`
+zeileINSERT=`tput il1`
+intANZAHLstatusZEILEN=3
+cursorZEILEstatus=cursorZEILE-6
+cursorZEILEkreisel=cursorZEILE+1
+
+
+function fncSTATUSauslesen {
+    # -Zum Prüfen ob das Gesamtskript noch läuft: flagQUITps existiert nicht in  $datei.$$.cache.tmp
+        cursorZEILEstatus=cursorZEILE-6
+        cp $dateiLOGS $dateiLOGStmp
+        echo -e "" >> $dateiLOGStmp
+        echo -e "---EOF---" >> $dateiLOGStmp
+        txtZEIT="["`date '+%T'`"]"
+        txtPLAYLIST=""
+        txtPLAYLISTvideo=""
+        txtPLAYLISTaktuell=""
+        txtPLAYLISTende=""
+        typeset -i x=0
+        while read txtSTATUS
+        do
+            if ( [[ "$txtSTATUS" == *\]\ Downloading\ video*of* ]] )
+            then
+                txtPLAYLISTvideo=${txtSTATUS//*video/}
+                txtPLAYLISTvideo=${txtPLAYLISTvideo//of/von}
+                txtPLAYLISTvideo=" (Video$txtPLAYLISTvideo)"
+                #txtPLAYLIST=" $txtPLAYLISTaktuell$txtPLAYLISTvideo$txtTRENNERplaylist$txtPLAYLIST"
+            fi
+            if ( [[ "$txtSTATUS" == *\]\ Downloading\ playlist:* ]] )
+            then
+                if ( [[ "$txtPLAYLISTende" != "" ]] )
+                then
+                    txtTRENNERaufzaehlung=", "
+                else
+                    txtTRENNERaufzaehlung=""
+                fi
+                if ( [[ "$txtPLAYLISTaktuell" != "" ]] )
+                then
+                    txtPLAYLISTende="$txtPLAYLISTaktuell$txtTRENNERaufzaehlung$txtPLAYLISTende"
+                fi
+                if ( [[ "$txtPLAYLISTende" != "" ]] )
+                then
+                    txtTRENNERplaylist="- Fertig: "
+                else
+                    txtTRENNERplaylist=""
+                fi
+                txtPLAYLISTaktuell=${txtSTATUS//*playlist: /}
+                #txtPLAYLISTende="$txtTRENNERplaylist$txtPLAYLISTaktuell"
+            fi
+            txtSTATUSausgabeX5x=$txtSTATUSausgabeX4x
+            txtSTATUSausgabeX4x=$txtSTATUSausgabeX3x
+            txtSTATUSausgabeX3x=$txtSTATUSausgabeX2x
+            txtSTATUSausgabeX2x=$txtSTATUSausgabeX1x
+            txtSTATUSausgabeX1x=$txtSTATUSausgabeX0x
+            txtSTATUSausgabeX0x=$txtSTATUS
+            # -Alte Variable wird teilweise noch abgefragt:
+            txtSTATUSausgabe=$txtSTATUSausgabeX0x
+        done < $dateiLOGStmp
+        txtPLAYLIST=" $txtPLAYLISTaktuell$txtPLAYLISTvideo $txtTRENNERplaylist$txtPLAYLISTende"
+        txtSTATUSausgabeX0=$txtSTATUSausgabeX0x
+        txtSTATUSausgabeX1=$txtSTATUSausgabeX1x
+        txtSTATUSausgabeX2=$txtSTATUSausgabeX2x
+        #echo -e "|- --- 0: $txtSTATUSausgabeX0 - 1: $txtSTATUSausgabeX1 - 2: $txtSTATUSausgabeX2 - 3: $txtSTATUSausgabeX3"
+        if ( [[ "$txtSTATUSausgabe" == "---EOF---" ]] || [[ "$txtSTATUSausgabe" == "" ]] )
+        then
+            txtSTATUSausgabeX0=$txtSTATUSausgabeX1x
+            txtSTATUSausgabeX1=$txtSTATUSausgabeX2x
+            txtSTATUSausgabeX2=$txtSTATUSausgabeX3x
+            txtSTATUSausgabe=$txtSTATUSausgabeX0
+            if ( [[ "$txtSTATUSausgabe" == "---EOF---" ]] || [[ "$txtSTATUSausgabe" == "" ]] )
+            then
+                txtSTATUSausgabeX0=$txtSTATUSausgabeX2x
+                txtSTATUSausgabeX1=$txtSTATUSausgabeX3x
+                txtSTATUSausgabeX2=$txtSTATUSausgabeX4x
+                txtSTATUSausgabe=$txtSTATUSausgabeX0
+                if ( [[ "$txtSTATUSausgabe" == "---EOF---" ]] || [[ "$txtSTATUSausgabe" == "" ]] )
+                then
+                    txtSTATUSausgabeX0=$txtSTATUSausgabeX3x
+                    txtSTATUSausgabeX1=$txtSTATUSausgabeX4x
+                    txtSTATUSausgabeX2=$txtSTATUSausgabeX5x
+                    txtSTATUSausgabe=$txtSTATUSausgabeX0
+                fi
+            fi
+        fi
+        #txtSTATUSausgabe=${txtSTATUSausgabe//*[download]/}
+        #txtSTATUSausgabe=${txtSTATUSausgabe//*[/[}
+        txtSTATUSausgabeX2=${txtSTATUSausgabeX2//*[/[}
+        txtSTATUSausgabeX1=${txtSTATUSausgabeX1//*[/[}
+        txtSTATUSausgabeX0=${txtSTATUSausgabeX0//*[/[}
+        tput cup $cursorZEILEstatus 0
+        echo $zeileDELETE
+        tput cup $cursorZEILEstatus 0
+        echo $zeileINSERT
+        tput cup $cursorZEILEstatus 0
+        txtZEIT="["`date '+%T'`"]"
+        echo -e "|- ${fmtFETT}$txtZEIT $txtSTATUSausgabeX2${fmtRESET}"
+        cursorZEILEstatus=cursorZEILEstatus+1
+        tput cup $cursorZEILEstatus 0
+        echo $zeileDELETE
+        tput cup $cursorZEILEstatus 0
+        echo $zeileINSERT
+        tput cup $cursorZEILEstatus 0
+        txtZEIT="["`date '+%T'`"]"
+        echo -e "|- ${fmtFETT}$txtZEIT $txtSTATUSausgabeX1${fmtRESET}"
+        cursorZEILEstatus=cursorZEILEstatus+1
+        tput cup $cursorZEILEstatus 0
+        echo $zeileDELETE
+        tput cup $cursorZEILEstatus 0
+        echo $zeileINSERT
+        tput cup $cursorZEILEstatus 0
+        txtZEIT="["`date '+%T'`"]"
+        echo -e "|- ${fmtFETT}$txtZEIT $txtSTATUSausgabeX0${fmtRESET}"
+        #rm $dateiLOGStmp
+        if ( [[ "$txtPLAYLIST" != "" ]] )
+        then
+            cursorZEILEstatus=cursorZEILEstatus+1
+            tput cup $cursorZEILEstatus 0
+            echo $zeileDELETE
+            tput cup $cursorZEILEstatus 0
+            echo $zeileINSERT
+            tput cup $cursorZEILEstatus 0
+            echo -e "|- Playlist Infos: $txtPLAYLIST"
+        fi
+    #done
+}
+#fncSTATUSauslesen &
+# +++++ ENDE Status aus Logdatei anzeigen +++++++++++++++++++++++++++++++++++
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+
+echo -e "|-"
+echo -e "|- Um das Skript zu Beenden drücken Sie \"q\"."
+echo -n "|- $datei wird ausgeführt... "
+
+MOVEasciiKREISEL &
+MOVEasciiKREISELpid=$!
+
+# CHECKeingabeTASTE
+# CHECKeingabeTASTEpid=$!
+
+
+
+
+
+# -Die Ausgabe abschalten. Wegen kill Status/Fehler Meldungen.
+exec >/dev/null 2>&1
+
+
+while ( [[ `ps -p $checkBEFEHLpid | grep $checkBEFEHLpid` != "" ]] && [[ "$actionKONTROLLE" != "stop" ]] )
+do
+    nix=1
+    CHECKeingabeTASTE
+    CHECKeingabeTASTEpid=$!
+    if ( [[ "$eingabeTASTE" == "q" ]] )
+    then
+        break
+    fi
+    kill $CHECKeingabeTASTEpid
+done
+
+tput cub 1
+if ( [[ "$eingabeTASTE" == "q" ]] )
+then
+    checkBEFEHLreturn="1"
+    echo -n " Abbruch durch Benutzer!"
+elif ( [[ "$actionKONTROLLE" == "stop" ]] )
+then
+    echo -n " Fertig!"
+fi
+
+#checkKILLreturnKREISEL=`kill -9 $MOVEasciiKREISELpid >/dev/null 2>/dev/null`
+#`kill -9 $MOVEasciiKREISELpid >/dev/null 2>&1`
+if ( [[ "$actionKONTROLLE" != "stop" ]] )
+then
+    kill $MOVEasciiKREISELpid
+fi
+
+#tput cub 1
+echo -e ""
+
+
+if ( [[ `ps -p $checkBEFEHLpid | grep $checkBEFEHLpid` != "" ]] )
+then
+    #checkKILLreturnDOWNLOAD= `kill $checkBEFEHLpid > /dev/null 2> /dev/null`
+    kill $checkBEFEHLpid
+    checkBEFEHLreturn="1"
+fi
+#echo -e "|- Das Skript wurde beendet!"
+
+
+
+# -die temporäre Logdatei wird wieder entfernt:
+rm $dateiLOGStmp
+
+
+
+
+
+
+# -Logdatei auf Fehler kontrollieren:
+# -Am Ende des Skripts muss die Logdatei nach ERROR: || error: abgesucht werden, falls es einen
+#  Treffer gibt wird die Fehlerzeile und die beiden Zeilen davor ausgegeben! Die URLs sollten im Falle
+#  eines Fehlers ja noch gespeichert sein, also einfach noch einmal mit den alten URLs starten.
+
+# -------------------------------------------------------------------
+# -ABLAGE: Alte Befehle:
+# `$checkBEFEHL` >> $dateiLOGS
+#`$checkBEFEHL` >> $dateiLOGS 2> `tty`
+#checkBEFEHLreturn=$?
+#echo -e "|- checkBEFEHL: $?"
+# -------------------------------------------------------------------
+
+# -die Original Archiv Datei aus der Config auslesen
+# -das temporäre Archiv an die Original Archiv Datei anhängen
+# -das temporäre Archiv löschen
+if ( [[ "$flagFORCE" == "true" ]] )
+then
+#     # +++++ START Config auslesen
+#     while read txtCONFIG
+#     do
+#         #nix=1
+#         if ( [[ "$txtCONFIG" == --download-archiv* ]] )
+#         then
+#             archivORIGINAL=${txtCONFIG//\-\-download\-archiv /}
+#             #echo $archivORIGINAL
+#             break
+#         fi
+#     done < ~/.config/youtube-dl/config
+#     # +++++ ENDE Config auslesen
+
+    # +++++ START archivTMP anhängen an archivORIGINAL
+    while read txtTMP
+    do
+        echo $txtTMP >> $archivORIGINAL
+    done < $archivTMP
+    # +++++ ENDE archivTMP anhängen an archivORIGINAL
+
+    # -das archivTMP löschen:
+    rm $archivTMP
+fi
+if ( [[ -f "$archivTMP" ]] )
+then
+    rm $archivTMP
+fi
+
+
+
+
+
+
+
+# -Die Ausgabe wieder auf den Bildschirm legen:
+#exec >`tty` 2>&1
+exec >`tty` 2>>$dateiLOGS
+
+
+
+
+
+
+
+# -Ende: Zeit und Status anzeigen
+zeitENDE=`date`
+txtINFOende=$txtENDEzeit$zeitENDE\\n"|- Details:\t$dateiLOGS"
+echo -e $txtINFOende
+echo -e $txtINFOende >> $dateiLOGS
+
+#if ([[ "$eingabeTASTE" == "e" ]]  )
+if ([[ "$actionKONTROLLE" == "stop" ]]  )
+then
+    checkBEFEHLreturn="0"
+fi
+
+if ([[ "$checkBEFEHLreturn" != "0" ]]  )
+then
+    txtINFOende2="|- "\\n"|- FEHLER:"\\n"|- $datei wurde abgebrochen!"\\n"|-"
+    # -FEHLER Sound:
+    beep -l 200 -f 200 -r 2 -D 100 --new -l 600 -f 160 -D 100
+    echo -e $txtINFOende2
+    echo -e $txtINFOende2 >> $dateiLOGS
+else
+    txtINFOende2="|- "\\n"|- $datei wurde erfolgreich beendet!"\\n"|-"
+    # -Erfolgreich Sound:
+    beep -l 200 -f 400 -r 2 -D 100 --new -l 600 -f 600 -D 100
+    echo -e $txtINFOende2
+    echo -e $txtINFOende2 >> $dateiLOGS
+    rm $dateiURLS
+    if ( [[ -f "$datei.$$.cache.tmp" ]] )
+    then
+        rm "$datei.$$.cache.tmp"
+    fi
+    # -Shutdown Option
+    if ( [[ "$intOFFminuten" != "" ]] )
+    then
+        echo -e "|- Das System wird in $intOFFminuten min ausgeschaltet. Zum Abbrechen drücken Sie bitte: \"q\""
+        intOFFsekunden=`echo -e "$intOFFminuten*60" | bc`
+        #echo -e "--- sek: $intOFFsekunden ---"
+        #sleep $intOFFsekunden
+        #eingabeTASTE=`dd bs=1 count=1 2>/dev/null`
+        intUTCsekunden=`date '+%s'`
+        intOFFsekunden=`echo -e "$intUTCsekunden + $intOFFsekunden" | bc`
+        while ( [[ "$eingabeTASTE" != "q" ]] && [[ "$intOFFsekunden" -gt "$intUTCsekunden" ]] )
+        do
+            read -n 1 -t 1 -s eingabeTASTE
+            #tput cub 1
+            intUTCsekunden=`date '+%s'`
+        done
+        
+        if ( [[ "$eingabeTASTE" != "q" ]] )
+        then
+            echo -e "|- Ausschalten..."
+            `/bin/systemctl poweroff`
+        else
+            echo -e "|- Ausschalten wurde abgebrochen!"
+        fi
+    fi
+fi
+
+
+
+
+
+
+exit 0;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+txtbox_pfad="\n\nVerzeichnis:\n$pfad"
+
+if ( [ "$flag_update" != "true" ] )
+ then
+ flag_update=false
+fi
+
+if ( [ "$flag_aufruf_intern" != "true" ] )
+ then
+ flag_aufruf_intern=false
+fi
+
+
+
+
+echo -e "***************************************************************"
+echo -e "*** Playliste erstellen in: $pfad"
+#echo -e "***************************************************************"
+
+
+
+for ia in $(ls --group-directories-first $pfad)
+ do
+ nix=0
+ # DEBUG infos:
+ #echo -e "DEBUG-flag_aufruf_intern: $flag_aufruf_intern"
+ #echo -e "DEBUG-ia: $ia"
+ #echo -e "DEBUG-pfad: $pfad"
+
+if ( [ -d "$pfad" ] && [ $pfad!="" ] )
+ then
+ ia=$pfad$ia
+ zusatz=""
+ #echo -e "---PFAD KOMPLETT: $ia"
+ # zusatz ist inzwischen unnötig!!!
+ #else
+ #zusatz="../"
+ #echo -e "---PFAD KOMPLETT: $pfad"
+fi
+
+
+
+if ( [ -d $ia ] )
+ then
+ pfad_uvz="$ia/"
+ suchpfad=$ia/*$extension
+ datei=$ia"/"$name_datei_playliste
+ datei_update=$ia"/"$name_datei_update
+ #echo -e "DEBUG-VERZEICHNIS: $ia"
+ $0 "$pfad_uvz" "$flag_update" "true"
+ #flag_aufruf_intern=false
+ continue
+ elif ( [ -d $pfad ] )
+ then
+ suchpfad=$pfad*$extension
+ datei=$pfad$name_datei_playliste
+ datei_update=$pfad$name_datei_update
+ flag_stop=1
+ #flag_aufruf_intern=false
+ else
+ suchpfad=*$extension
+ datei=$name_datei_playliste
+ datei_update=$name_datei_update
+ flag_stop=1
+ #flag_aufruf_intern=false
+fi
+
+
+
+
+
+#echo -e "*** Check auf Inhalt: ***"
+#echo -e "-suchpfad: $suchpfad"
+# falls extension nicht passt, wird zum naechsten datensatz gesprungen:
+if [[ "$ia" != *$extension ]]
+  then
+  #echo -e "-INFO: $ia passt nicht zum Suchstring: \"*$extension\""
+  continue
+fi
+
+#for i in $suchpfad
+# for i in $(ls --group-directories-first $pfad)
+#  do
+#  echo -e "-i: $i"
+#  #nix=$[nix+1]
+# 
+#  #if ( [ -f $i ] && [ "$i" != "*$extension" ] )
+#  #if [ [ -f $i ] && [ "$i" = *.mp* ] ]
+#  #if ( [[ -f $i ]] && [[ "$i" = *.mp* ]] )
+#  # funktioniert: if [[ "$i" = *.mp* ]]
+#  if [[ "$i" == *.mp* ]]
+#   then
+#   echo -e "--- extension passt zum suchstring: \"$extension\" ---"
+#   nix=$[nix+1]
+#   else
+#   # inhalt $i ist eine datei, aber endet nicht mit der korrekten
+#   # zeichenfolge. daher wird zum naechsten datensatz gesprungen!
+#   echo -e "--- FEHLER: extension der datei passt nicht zum suchstring: \"$extension\" ---"
+#   continue
+#  fi
+# 
+#  #echo -e "RENAME $i" | sed "s/ /_/g"
+#  #echo -e "---RENAME: $i"
+#  #rename 's/[^abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_ \-\.\/]/\-/g' "$i"
+#  #rename  's/ /_/g' "$i"
+#  #echo -e "---RENAME new: $i"
+#  #echo -e "- $i -- $nix -"
+# done
+# 
+# #if( [ "$nix"<2 ] )
+# if (("$nix"<2))
+#  then
+#  echo -e "...Nichts zu tun."
+#  continue
+# fi
+# echo -e "...done"
+
+
+
+
+#echo -e "-INFO: Datei erstellen..."
+z_id=0
+# ein update script fuer diese playliste erstellen:
+touch $datei_update
+echo -e "#!/bin/bash" > $datei_update
+echo -e "# --- ein update script fuer die playliste ---" >> $datei_update
+#echo -e "" >> $datei_update
+echo -e "# aktueller ort wird als pfad angenommen:" >> $datei_update
+echo -e "pfad=\`pwd\`" >> $datei_update
+echo -e "pfad=\$pfad/" >> $datei_update
+echo -e "$0 \$pfad true" >> $datei_update
+chmod a+x $datei_update
+
+
+# die playliste als datei erstellen:
+#echo -e "$datei"
+touch $datei
+#text="#EXTM3U"
+echo -e "#EXTM3U" > $datei
+#mkdir tmplxfileorder
+for i in $suchpfad
+ do
+ #echo -e "RENAME $i" | sed "s/ /_/g"
+ #echo -e "---COPY $i"
+ #echo -e "---RM oder MOVE $i"
+ echo -e "#EXTINF:$z_id,$zusatz$i" >> $datei
+ echo -e "$zusatz$i" >> $datei
+ z_id=$[z_id+1]
+ #ffmpeg -i $i -acodec copy -f segment -segment_time 300 $outfile
+ #ffmpeg -i $i -acodec copy -t 00:30:00 -ss 00:00:00 $outfile
+ #echo -e "...done"
+done
+
+zeitENDE=`date`
+if (($flag_stop==1))
+ then
+ echo -e "-DONE: $suchpfad"
+# if ( [ ! $flag_aufruf_intern ] )
+ if [[ "$flag_aufruf_intern" != true ]]
+  then
+  if [[ "$flag_update" == true ]]
+   then
+   kdialog --title="INFO" --msgbox="Update erfolgreich!$txtbox_pfad\n\n\n-ende:update_01-"
+   else
+   #echo -e "-MSGBOX: flag_stop"
+   kdialog --title="INFO" --msgbox="Anlegen der Dateien erfolgreich!$txtbox_pfad\n\n\n-ende:flag_stop-"
+  fi
+ fi
+ echo -e "-ENDE: flag_stop"
+ echo -e "-Gestartet: $zeitSTART"
+ echo -e "-Beendet  : $zeitENDE"
+ echo -e "----------------------------------------"
+ exit 0;
+fi
+
+echo -e "-DONE: $suchpfad"
+
+# ende der ia schleife
+done
+
+zeitENDE=`date`
+if ( [ "$flag_update" == true ] && [ "$flag_aufruf_intern" != true ] )
+ then
+ #echo -e "-MSGBOX: update"
+ kdialog --title="INFO" --msgbox="Update erfolgreich!$txtbox_pfad\n\n\n-ende:update_02-"
+ echo -e "-ENDE: update"
+ echo -e "-Gestartet: $zeitSTART"
+ echo -e "-Beendet  : $zeitENDE"
+ echo -e "----------------------------------------"
+ exit 0;
+fi
+
+zeitENDE=`date`
+if ( [ "$flag_aufruf_intern" != true ] )
+ then
+ #echo -e "-MSGBOX: normal"
+ kdialog --title="INFO" --msgbox="Anlegen der Dateien erfolgreich!$txtbox_pfad\n\n\n-ende:normal-"
+ echo -e "-ENDE: normal"
+ echo -e "-Gestartet: $zeitSTART"
+ echo -e "-Beendet  : $zeitENDE"
+ echo -e "----------------------------------------"
+fi
+
+
+
+
+
+
+
+
+
+
+
+
+

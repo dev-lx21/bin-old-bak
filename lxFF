@@ -13,7 +13,8 @@
 #  Video -> Video...
 #
 # ----- Bugs:
-# -Dateiname enthält Punkte!?!
+# -Dateinamen mit Punkten!?!
+# -UVZ: optionenZIEL fehlt! Testmodus ist dann auch fehlerhaft!
 #
 # ----- DONE:
 # -Verarbeitungsgeschwindigkeit verbessern: siehe cpulimit, aber zu viele Forks!
@@ -22,7 +23,8 @@
 #
 # ---------------------------------------------------------------------------------------
 # ---------------------------------------------------------------------------------------
-# [[ -z "$1" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return
+# [[ -z "$1" ]] && echo -e "|- ${FUNCNAME[0]} FEHLER:"\\t"1. Argument nicht angegeben!" && return 11
+# [[ -z "$2" ]] && echo -e "|- ${FUNCNAME[0]} FEHLER:"\\t"2. Argument nicht angegeben!" && return 12
 # -------------------------------------------------------------------------------------------------
 # ----- START -------------------------------------------------------------------------------------
 # ----- ENDE --------------------------------------------------------------------------------------
@@ -269,6 +271,10 @@ function fncTime2SekSek2Time {
 #
 # -Wenn Anzahl und/oder Typ eines Arguments fehlerhaft sind, erscheint eine Fehlermeldung
 #  und ggf kann mittels kdialog die Angabe korrigiert werden!
+#
+# -Der interne Aufruf um Unterverzeichnisse zu bearbeiten:
+# --$0 "$pfadUVZ" "$extension" "$extensionZIEL" ":flagAUFRUFintern:" "$dateiLOGS" "$optionenZIEL" "$flagBAKaction" "$flagTESTDRIVE"
+
 
 typeset -i zz=0
 typeset -i intANZAHLargumente=0
@@ -321,7 +327,7 @@ then
         dateiLOGSglobal="$5"
         optionenZIELglobal="$6"
         flagBAKaction="$7"
-        flagTESTDRIVEintern="$8"
+        flagTESTDRIVEglobal="$8"
     fi
     
     #[[ "$argFLAGintern" != ":flagAUFRUFintern:" ]] && for i in "$@"
@@ -384,7 +390,7 @@ then
             fi
         fi
         
-        if ( ( [[ "$i" == -*t* ]] && [[ "$i" != -*tls* ]] ) || ( [[ "$flagTESTDRIVEintern" == "true" ]] ) )
+        if ( ( [[ "$i" == -*t* ]] && [[ "$i" != -*tls* ]] ) || ( [[ "$flagTESTDRIVEglobal" == "true" ]] ) )
         then
             flagTESTDRIVE="true"
             txtTESTMODEtitel="TESTMODE"
@@ -774,7 +780,7 @@ txtHILFE=$txtBENUTZUNG\\n\
 "|-"\\n\
 "|- WICHTIG:"\\n\
 "|- -Dieses Tool benötigt folgende Pakete um zu funktionieren:"\\n\
-"|-  ffmpeg und die bevorzugten Codecs (zum Beispiel: h264, libmp3lame,...)"\\n\
+"|-  cpulimit, bc, mediainfo, ffmpeg und die bevorzugten Codecs"\\n\
 "|- -Das Skript arbeitet rekursiv, d.h. es werden auch alle Dateien in Unterverzeichnissen"\\n\
 "|-  umgewandelt!"\\n\
 "|-"\\n\
@@ -900,6 +906,11 @@ then
     echo -e $txtHILFE
     exit 0;
 fi
+
+
+
+
+
 
 # -Die Logdatei anzeigen:
 # --verschiedene Optionen: l? oder nur l
@@ -1067,6 +1078,9 @@ function fncLISTmedia {
     #arrMEDIAvideoMP4[$z]="mp4.HD MPEG4:HD-Format on"
     arrMEDIAvideoMP4[$z]="mp4.HD MPEG4:HD-Format"
     z=z+1
+    #arrMEDIAvideoMP4[$z]="mp4.HD MPEG4:HD-Format on"
+    arrMEDIAvideoMP4[$z]="mp4.HD25fps MPEG4:HD-Format,25fps"
+    z=z+1
     #arrMEDIAvideoMP4[$z]="mp4.HDtxtNAME MPEG4:HD-Format,Textbox(Dateiname) off"
     arrMEDIAvideoMP4[$z]="mp4.HDtxtNAME MPEG4:HD-Format,Textbox(Dateiname)"
     z=z+1
@@ -1209,10 +1223,266 @@ done
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ================================================================================================================
+# ===== START Mime Funktionen ====================================================================================
+# ================================================================================================================
+
+function fncEINGABEverzeichnisse {
+    # *****************************************************************************
+    # ***** START Eingabe Quellen Verzeichnis *************************************
+    checkDIALOGhinweis=""
+    while ( [[ "$intANZAHLquellen" -gt 0 ]] && [[ "$intZ" -le "$intMAXanzahlQUELLVERZEICHNISSE" ]] )
+    do
+        intANZAHLquellen=intANZAHLquellen-1
+
+        # -Quelle auswählen:
+        if ( [[ "$eingabeQUELLE" == "" ]] )
+        then
+            eingabeQUELLE=$(kdialog --title="Bitte Verzeichnis ($intZ/$intMAXanzahlQUELLVERZEICHNISSE) wählen:" --getexistingdirectory $eingabeQUELLEbak 2>/dev/null)
+            #eingabeQUELLE=$(kdialog --title="Quelle wählen:" --getopenfilename "/" --multiple)
+            checkDIALOG=$(echo -e "$?")
+        fi
+        if ( [[ "$eingabeQUELLE" != "" ]] && [[ "$eingabeQUELLE" != */ ]] )
+        then
+            eingabeQUELLE=$eingabeQUELLE"/"
+        fi
+        checkDIALOGfehler=""
+        # -Case für Fensterüberwachung:
+        case "$checkDIALOG" in
+            (0)
+                intANZAHLquellen=1
+                checkDIALOGfehler="" ;;
+            (1)
+                # -abbruchBENUTZER
+                if ( [[ "$intZ" -lt 2 ]] )
+                then
+                    checkDIALOGfehler="|- Auswahl Quellverzeichnis: FEHLER!"\\n"|- Sie haben die Auswahl des Quellverzeichnis abgebrochen. Das Skript wird daher beendet."
+                else
+                    checkDIALOGfehler=""
+                    checkDIALOGhinweis="|- Die Auswahl zusätzlicher Quellverzeichnisse wurde abgebrochen. Die bereits gewählten Quellen werden übernommen."
+                fi ;;
+            (*)
+                # -abbruchFEHLER
+                checkDIALOGfehler="|- Auswahl Quellverzeichnis: FEHLER!"\\n\
+    "|- Ihre Eingabe konnte nicht gespeichert werden, da der Fensterprozess beendet"\\n\
+    "|- wurde. Entweder gab es einen internen Fehler oder ein anderer Benutzer/Prozess"\\n\
+    "|- hat das Programm geschlossen. Bitte starten Sie $datei neu!"\\n\
+    "|-"\\n\
+    "|- Um nähere Informationen zu erhalten, sollten Sie ihre Logdateien kontrollieren"\\n\
+    "|- und die Ausgabe in der Konsole beachten." ;;
+        esac
+        # -Fehlerausgabe und Skript beenden:
+        if ( [[ "$checkDIALOGfehler" != "" ]] )
+        then
+            # -Fehlermeldung ausgeben und Skript beenden:
+            #dateiLOGS=$eingabeQUELLE$dateiLOGSohnePFAD
+            #echo -en "" > $dateiLOGS
+            fncECHOlxD "$txtKOPF"
+            fncECHOlxD "$checkDIALOGfehler"
+            fncECHOlxD "|-"
+            # -Abbrechen:
+            exit 1;
+        else
+            txtINFOeingabeQUELLE="|- -$intZ. Quelle:\\t$eingabeQUELLE"
+            #fncECHOlx $txtINFOeingabeQUELLE
+            intZ=intZ+1
+        fi
+
+        # -Quellen zusammenbauen:
+        if ( [[ "$eingabeQUELLEkomplett" == "" ]] )
+        then
+            eingabeQUELLEkomplett=$eingabeQUELLE
+        else
+            eingabeQUELLEkomplett=$eingabeQUELLEkomplett" "$eingabeQUELLE
+        fi
+        eingabeQUELLEbak="$eingabeQUELLE"
+        eingabeQUELLE=""
+
+    done
+    # ***** ENDE Eingabe Quellen Verzeichnis **************************************
+    # *****************************************************************************
+}
+
+function fncMimeTypeAuswahl {
+    #typeset -n strARRAY=arrMEDIAauswahl
+    #fncRADIOLISTarray
+    #txtLISTEauswahl=$txtLISTEarray
+    txtDIALOGtitle="Auswahl Dateityp Quelle:"
+    MimeTypeAuswahl=$(kdialog --title="$txtDIALOGtitle" --radiolist="<h3><center>$datei</center></h3><hr>\
+    <h4>Welcher Dateityp (Mime-Type) soll umgewandelt werden?</h4><br>\
+    Das genaue Dateiformat der Quelldaten kann im nächsten Schritt gewählt werden.<br><br>\
+    Quelle: $txtInfoQuelleKomplett<br>" \
+    $(fncRADIOLISTfromARRAY "arrMEDIAauswahl01" "arrMEDIAauswahl02"))
+    checkDIALOG=$(echo -e "$?")
+    debugWERT=$MimeTypeAuswahl
+    fncFEHLERdialog "$txtDIALOGtitle"
+}
+
+function fncEXTENSIONquelle {
+    txtDIALOGtitle="Dateiformat Quelle:"
+    extension=$(kdialog --title="$txtDIALOGtitle" --radiolist="<h3><center>$datei</center></h3><hr>\
+    <h4>Welche Dateien sollen umgewandelt werden?</h4><br>\
+    Alle Dateien mit diesem Format innerhalb der gewählten Quellverzeichnisse werden<br>\
+    umgewandelt. Unterverzeichnisse werden dabei automatisch mitbearbeitet.<br><br>\
+    Quelle: $txtInfoQuelleKomplett<br>" \
+    $(fncRADIOLISTfromARRAY "$MimeTypeAuswahl" "alle"))
+    checkDIALOG=$(echo -e "$?")
+    debugWERT=$extension
+    extensionCASEUP=${extension^^}
+    fncEXTENSIONfromARRAY "$MimeTypeAuswahl"
+    #echo -e "--- ${arrEXTENSIONSalle[@]}"
+    fncFEHLERdialog "$txtDIALOGtitle"
+}
+
+function fncEXTENSIONziel {
+    txtDIALOGtitle="Neues Dateiformat:"
+    extensionZIEL=$(kdialog --title="$txtDIALOGtitle" --radiolist="<h3><center>$datei</center></h3><hr>\
+    <h4>In welches Format sollen die Dateien umgewandelt werden?</h4><br>\
+    Alle Dateien im $extensionCASEUP Format innerhalb der gewählten Quellen werden<br>\
+    in das neue Format umgewandelt. Bei einigen Formaten ist es möglich<br>\
+    noch zusätzliche Optionen (Auflösung, Qualität,...) auszuwählen.<br><br>\
+    Quelle: $txtInfoQuelleKomplett<br>" \
+    $(fncRADIOLISTfromARRAY "$MimeTypeAuswahl"))
+    checkDIALOG=$(echo -e "$?")
+    debugWERT=$extensionZIEL
+    optionenZIEL=""
+    [[ "$extensionZIEL" == *.* ]] && optionenZIEL=${extensionZIEL//*./} && extensionZIEL=${extensionZIEL//.*/}
+    extensionZIELCASEUP=${extensionZIEL^^}
+    optionenZIEL=${optionenZIEL^^}
+    fncFEHLERdialog "$txtDIALOGtitle"
+}
+
+function fncOPTIONENziel {
+    txtDIALOGtitle="$extensionZIELCASEUP Optionen:"
+    optionenZIEL=$(kdialog --title="$txtDIALOGtitle" --radiolist="<h3><center>$datei</center></h3><hr>\
+    <h4>Zusätzliche Optionen für das Zielformat ($extensionZIELCASEUP) festlegen:</h4><br>\
+    Automatisch werden beim Umwandeln die auf dem System vorhandenen<br>\
+    Standard Codecs für das gewählte Format benutzt. Bei Codecs-Copy<br>\
+    werden die Original Codecs einfach nur kopiert.<br><br>\
+    Quelle: $txtInfoQuelleKomplett<br>" \
+    $(fncRADIOLISTfromARRAY "$MimeTypeAuswahl$extensionZIELCASEUP"))
+    checkDIALOG=$(echo -e "$?")
+    debugWERT=$optionenZIEL
+    fncFEHLERdialog "$txtDIALOGtitle"
+}
+
+function fncMimeTypeFromExtension {
+    strLocalExtension="$1"
+    strLocalMimeTypeFromExtension=""
+
+    # -Vergleich Extension-MimeType: audio
+    typeset -i z=0
+    while [[ ${arrMEDIAaudio[$z]} != "" ]]
+    do
+        [[ ${arrMEDIAaudio[$z]} == *$strLocalExtension* ]] && strLocalMimeTypeFromExtension="audio" && break
+        z=z+1
+    done
+
+    # -Vergleich Extension-MimeType: video
+    typeset -i z=0
+    while [[ ${arrMEDIAvideo[$z]} != "" ]]
+    do
+        [[ ${arrMEDIAvideo[$z]} == *$strLocalExtension* ]] && strLocalMimeTypeFromExtension="video" && break
+        z=z+1
+    done
+
+    # -Vergleich Extension-MimeType: bild
+    typeset -i z=0
+    while [[ ${arrMEDIAbild[$z]} != "" ]]
+    do
+        [[ ${arrMEDIAbild[$z]} == *$strLocalExtension* ]] && strLocalMimeTypeFromExtension="bild" && break
+        z=z+1
+    done
+
+    MimeTypeAuswahl="$strLocalMimeTypeFromExtension"
+}
+
+function fncFEHLERdialog {
+    txtFEHLERdialogINSIDE=""
+    [ "$1" ] && txtFEHLERdialogINSIDE="$1 "
+    # -Case für Fensterüberwachung:
+    case "$checkDIALOG" in
+        (0)
+            # -kein Fehler!
+            checkDIALOGfehler="" ;;
+        (1)
+            # -Abbruch durch Benutzer!
+            checkDIALOGfehler="|- $txtFEHLERdialogINSIDE""FEHLER!"\\n"|- Sie haben die Eingabe abgebrochen. Das Skript wird daher beendet." ;;
+        (*)
+            # -Abbruch durch Fehler!
+            checkDIALOGfehler="|- $txtFEHLERdialogINSIDE""FEHLER!"\\n\
+            "|- Ihre Eingabe konnte nicht gespeichert werden, da der Fensterprozess beendet"\\n\
+            "|- wurde. Entweder gab es einen internen Fehler oder ein anderer Benutzer/Prozess"\\n\
+            "|- hat das Programm geschlossen. Bitte starten Sie $datei neu!"\\n\
+            "|-"\\n\
+            "|- Um nähere Informationen zu erhalten, sollten Sie ihre Logdateien kontrollieren"\\n\
+            "|- und die Ausgabe in der Konsole beachten." ;;
+    esac
+    # -Fehlerausgabe und Skript beenden:
+    if ( [[ "$checkDIALOGfehler" != "" ]] )
+    then
+        # -Fehlermeldung ausgeben und Skript beenden:
+        fncECHOlxD "$txtKOPF"
+        fncECHOlxD "$checkDIALOGfehler"
+        fncECHOlxD "|-"
+        #kdialog --title="FEHLER" --error="$checkDIALOGfehler"
+        exit 0;
+    fi
+    # -DEBUG:
+    #fncECHOlx "|--- $debugWERT"
+}
+
+
+typeset -n strARRAY=arrMEDIAaudio
+fncRADIOLISTarray
+txtLISTEaudio=$txtLISTEarray
+
+typeset -n strARRAY=arrMEDIAvideoMP4
+fncRADIOLISTarray
+txtLISTEvideoMP4=$txtLISTEarray
+
+typeset -n strARRAY=arrMEDIAvideo
+fncRADIOLISTarray
+txtLISTEvideo=$txtLISTEarray
+
+typeset -n strARRAY=arrMEDIAbild
+fncRADIOLISTarray
+txtLISTEbild=$txtLISTEarray
+
+txtLISTEkomplett=$txtLISTEaudio$txtLISTEvideo$txtLISTEbild
+#echo $txtLISTEkomplett
+txtLISTEkomplettOHNEalle=${txtLISTEaudio//audio*/}${txtLISTEvideo//video*/}${txtLISTEbild//bild*/}
+#echo $txtLISTEkomplettOHNEalle
+
+# ================================================================================================================
+# ===== ENDE Mime Funktionen =====================================================================================
+# ================================================================================================================
+
+
+
+
+
+
+
 MimeTypeAuswahl=""
 optionenZIEL=""
 # -----------------------------------------------------------------------------
-# ----- START if Argumente aus Kommandozeile ----------------------------------
+# ----- START if Argumente aus Befehlszeile ----------------------------------
 #if ( [[ "$intANZAHLargumente" -gt 2 ]] )
 if ( [[ $# -gt 2 ]] )
 then
@@ -1221,7 +1491,7 @@ then
 #         dateiLOGS=$argVERZEICHNIS$dateiLOGSohnePFAD
 #         echo -en "" > $dateiLOGS
 #         fncECHOlx "$txtKOPF"
-#         fncECHOlx "|- Die Argumente aus der Kommandozeile werden übernommen und $datei"
+#         fncECHOlx "|- Die Argumente aus der Befehlszeile werden übernommen und $datei"
 #         fncECHOlx "|- wird mit folgenden Optionen gestartet:"
 #         fncECHOlx "|- -Arbeitsverzeichnis:\\t$argVERZEICHNIS"
 #         fncECHOlx "|- -Dateiformat Quelle:\\t$argEXTquelle"
@@ -1235,243 +1505,19 @@ then
     extensionCASEUP=${extension^^}
     extensionZIELCASEUP=${extensionZIEL^^}
 
+    txtInfoQuelleKomplett=${eingabeQUELLEkomplett// /<br>}
 
 else
 
-
     eingabeQUELLEkomplett=""
     eingabeQUELLEbak=`pwd`
-
-
-
-    function fncEINGABEverzeichnisse {
-        # *****************************************************************************
-        # ***** START Eingabe Quellen Verzeichnis *************************************
-        checkDIALOGhinweis=""
-        while ( [[ "$intANZAHLquellen" -gt 0 ]] && [[ "$intZ" -le "$intMAXanzahlQUELLVERZEICHNISSE" ]] )
-        do
-            intANZAHLquellen=intANZAHLquellen-1
-
-            # -Quelle auswählen:
-            if ( [[ "$eingabeQUELLE" == "" ]] )
-            then
-                eingabeQUELLE=$(kdialog --title="Bitte Verzeichnis ($intZ/$intMAXanzahlQUELLVERZEICHNISSE) wählen:" --getexistingdirectory $eingabeQUELLEbak 2>/dev/null)
-                #eingabeQUELLE=$(kdialog --title="Quelle wählen:" --getopenfilename "/" --multiple)
-                checkDIALOG=$(echo -e "$?")
-            fi
-            if ( [[ "$eingabeQUELLE" != "" ]] && [[ "$eingabeQUELLE" != */ ]] )
-            then
-                eingabeQUELLE=$eingabeQUELLE"/"
-            fi
-            checkDIALOGfehler=""
-            # -Case für Fensterüberwachung:
-            case "$checkDIALOG" in
-                (0)
-                    intANZAHLquellen=1
-                    checkDIALOGfehler="" ;;
-                (1)
-                    # -abbruchBENUTZER
-                    if ( [[ "$intZ" -lt 2 ]] )
-                    then
-                        checkDIALOGfehler="|- Auswahl Quellverzeichnis: FEHLER!"\\n"|- Sie haben die Auswahl des Quellverzeichnis abgebrochen. Das Skript wird daher beendet."
-                    else
-                        checkDIALOGfehler=""
-                        checkDIALOGhinweis="|- Die Auswahl zusätzlicher Quellverzeichnisse wurde abgebrochen. Die bereits gewählten Quellen werden übernommen."
-                    fi ;;
-                (*)
-                    # -abbruchFEHLER
-                    checkDIALOGfehler="|- Auswahl Quellverzeichnis: FEHLER!"\\n\
-        "|- Ihre Eingabe konnte nicht gespeichert werden, da der Fensterprozess beendet"\\n\
-        "|- wurde. Entweder gab es einen internen Fehler oder ein anderer Benutzer/Prozess"\\n\
-        "|- hat das Programm geschlossen. Bitte starten Sie $datei neu!"\\n\
-        "|-"\\n\
-        "|- Um nähere Informationen zu erhalten, sollten Sie ihre Logdateien kontrollieren"\\n\
-        "|- und die Ausgabe in der Konsole beachten." ;;
-            esac
-            # -Fehlerausgabe und Skript beenden:
-            if ( [[ "$checkDIALOGfehler" != "" ]] )
-            then
-                # -Fehlermeldung ausgeben und Skript beenden:
-                #dateiLOGS=$eingabeQUELLE$dateiLOGSohnePFAD
-                #echo -en "" > $dateiLOGS
-                fncECHOlxD "$txtKOPF"
-                fncECHOlxD "$checkDIALOGfehler"
-                fncECHOlxD "|-"
-                # -Abbrechen:
-                exit 1;
-            else
-                txtINFOeingabeQUELLE="|- -$intZ. Quelle:\\t$eingabeQUELLE"
-                #fncECHOlx $txtINFOeingabeQUELLE
-                intZ=intZ+1
-            fi
-
-            # -Quellen zusammenbauen:
-            if ( [[ "$eingabeQUELLEkomplett" == "" ]] )
-            then
-                eingabeQUELLEkomplett=$eingabeQUELLE
-            else
-                eingabeQUELLEkomplett=$eingabeQUELLEkomplett" "$eingabeQUELLE
-            fi
-            eingabeQUELLEbak="$eingabeQUELLE"
-            eingabeQUELLE=""
-
-        done
-        # ***** ENDE Eingabe Quellen Verzeichnis **************************************
-        # *****************************************************************************
-    }
     
     #fncECHOlx $checkDIALOGhinweis
     
     [ "$argVERZEICHNIS" == "" ] && fncEINGABEverzeichnisse
-    [ "$argVERZEICHNIS" == "" ] || eingabeQUELLEkomplett="$argVERZEICHNIS"
+    [ "$argVERZEICHNIS" != "" ] && eingabeQUELLEkomplett="$argVERZEICHNIS"
     # -Für die Ausgabe in den Dialog Fenstern:
     txtInfoQuelleKomplett=${eingabeQUELLEkomplett// /<br>}
-
-
-
-    # txtQUELLEN=$eingabeQUELLEkomplett
-    # fncECHOlx "|-"
-    # du -hsc "$eingabeQUELLEkomplett"
-    #fncECHOlx "|-"
-    #fncRADIOLISTanzeigenARR "arrMEDIAauswahl01" "arrMEDIAauswahl02"
-    #exit 0;
-
-    # -Die Formatliste anzeigen:
-    # typeset -n strARRAY=arrMEDIAaudio
-    # fncRADIOLISTanzeigen
-    # typeset -n strARRAY=arrMEDIAvideo
-    # fncRADIOLISTanzeigen
-    # typeset -n strARRAY=arrMEDIAbild
-    # fncRADIOLISTanzeigen
-
-
-    typeset -n strARRAY=arrMEDIAaudio
-    fncRADIOLISTarray
-    txtLISTEaudio=$txtLISTEarray
-
-    typeset -n strARRAY=arrMEDIAvideoMP4
-    fncRADIOLISTarray
-    txtLISTEvideoMP4=$txtLISTEarray
-    
-    typeset -n strARRAY=arrMEDIAvideo
-    fncRADIOLISTarray
-    txtLISTEvideo=$txtLISTEarray
-
-    typeset -n strARRAY=arrMEDIAbild
-    fncRADIOLISTarray
-    txtLISTEbild=$txtLISTEarray
-
-
-    txtLISTEkomplett=$txtLISTEaudio$txtLISTEvideo$txtLISTEbild
-    #echo $txtLISTEkomplett
-
-    txtLISTEkomplettOHNEalle=${txtLISTEaudio//audio*/}${txtLISTEvideo//video*/}${txtLISTEbild//bild*/}
-    #echo $txtLISTEkomplettOHNEalle
-
-    
-    function fncMimeTypeAuswahl {
-        #typeset -n strARRAY=arrMEDIAauswahl
-        #fncRADIOLISTarray
-        #txtLISTEauswahl=$txtLISTEarray
-        txtDIALOGtitle="Auswahl Dateityp Quelle:"
-        MimeTypeAuswahl=$(kdialog --title="$txtDIALOGtitle" --radiolist="<h3><center>$datei</center></h3><hr>\
-        <h4>Welcher Dateityp (Mime-Type) soll umgewandelt werden?</h4><br>\
-        Das genaue Dateiformat der Quelldaten kann im nächsten Schritt gewählt werden.<br><br>\
-        Quelle: $txtInfoQuelleKomplett<br>" \
-        $(fncRADIOLISTfromARRAY "arrMEDIAauswahl01" "arrMEDIAauswahl02"))
-        checkDIALOG=$(echo -e "$?")
-        debugWERT=$MimeTypeAuswahl
-        fncFEHLERdialog "$txtDIALOGtitle"
-    }
-
-
-    function fncEXTENSIONquelle {        
-        txtDIALOGtitle="Dateiformat Quelle:"
-        extension=$(kdialog --title="$txtDIALOGtitle" --radiolist="<h3><center>$datei</center></h3><hr>\
-        <h4>Welche Dateien sollen umgewandelt werden?</h4><br>\
-        Alle Dateien mit diesem Format innerhalb der gewählten Quellverzeichnisse werden<br>\
-        umgewandelt. Unterverzeichnisse werden dabei automatisch mitbearbeitet.<br><br>\
-        Quelle: $txtInfoQuelleKomplett<br>" \
-        $(fncRADIOLISTfromARRAY "$MimeTypeAuswahl" "alle"))
-        checkDIALOG=$(echo -e "$?")
-        debugWERT=$extension
-        extensionCASEUP=${extension^^}
-        fncEXTENSIONfromARRAY "$MimeTypeAuswahl"
-        #echo -e "--- ${arrEXTENSIONSalle[@]}"
-        fncFEHLERdialog "$txtDIALOGtitle"
-    }
-
-
-    function fncEXTENSIONziel {
-        txtDIALOGtitle="Neues Dateiformat:"
-        extensionZIEL=$(kdialog --title="$txtDIALOGtitle" --radiolist="<h3><center>$datei</center></h3><hr>\
-        <h4>In welches Format sollen die Dateien umgewandelt werden?</h4><br>\
-        Alle Dateien im $extensionCASEUP Format innerhalb der gewählten Quellen werden<br>\
-        in das neue Format umgewandelt. Bei einigen Formaten ist es möglich<br>\
-        noch zusätzliche Optionen (Auflösung, Qualität,...) auszuwählen.<br><br>\
-        Quelle: $txtInfoQuelleKomplett<br>" \
-        $(fncRADIOLISTfromARRAY "$MimeTypeAuswahl"))
-        checkDIALOG=$(echo -e "$?")
-        debugWERT=$extensionZIEL
-        optionenZIEL=""
-        [[ "$extensionZIEL" == *.* ]] && optionenZIEL=${extensionZIEL//*./} && extensionZIEL=${extensionZIEL//.*/}
-        extensionZIELCASEUP=${extensionZIEL^^}
-        optionenZIEL=${optionenZIEL^^}
-        fncFEHLERdialog "$txtDIALOGtitle"
-    }
-    
-    
-    function fncOPTIONENziel {
-        txtDIALOGtitle="$extensionZIELCASEUP Optionen:"
-        optionenZIEL=$(kdialog --title="$txtDIALOGtitle" --radiolist="<h3><center>$datei</center></h3><hr>\
-        <h4>Zusätzliche Optionen für das Zielformat ($extensionZIELCASEUP) festlegen:</h4><br>\
-        Automatisch werden beim Umwandeln die auf dem System vorhandenen<br>\
-        Standard Codecs für das gewählte Format benutzt. Bei Codecs-Copy<br>\
-        werden die Original Codecs einfach nur kopiert.<br><br>\
-        Quelle: $txtInfoQuelleKomplett<br>" \
-        $(fncRADIOLISTfromARRAY "$MimeTypeAuswahl$extensionZIELCASEUP"))
-        checkDIALOG=$(echo -e "$?")
-        debugWERT=$optionenZIEL
-        fncFEHLERdialog "$txtDIALOGtitle"
-    }
-    
-
-
-
-    function fncFEHLERdialog {
-        txtFEHLERdialogINSIDE=""
-        [ "$1" ] && txtFEHLERdialogINSIDE="$1 "
-        # -Case für Fensterüberwachung:
-        case "$checkDIALOG" in
-            (0)
-                # -kein Fehler!
-                checkDIALOGfehler="" ;;
-            (1)
-                # -Abbruch durch Benutzer!
-                checkDIALOGfehler="|- $txtFEHLERdialogINSIDE""FEHLER!"\\n"|- Sie haben die Eingabe abgebrochen. Das Skript wird daher beendet." ;;
-            (*)
-                # -Abbruch durch Fehler!
-                checkDIALOGfehler="|- $txtFEHLERdialogINSIDE""FEHLER!"\\n\
-                "|- Ihre Eingabe konnte nicht gespeichert werden, da der Fensterprozess beendet"\\n\
-                "|- wurde. Entweder gab es einen internen Fehler oder ein anderer Benutzer/Prozess"\\n\
-                "|- hat das Programm geschlossen. Bitte starten Sie $datei neu!"\\n\
-                "|-"\\n\
-                "|- Um nähere Informationen zu erhalten, sollten Sie ihre Logdateien kontrollieren"\\n\
-                "|- und die Ausgabe in der Konsole beachten." ;;
-        esac
-        # -Fehlerausgabe und Skript beenden:
-        if ( [[ "$checkDIALOGfehler" != "" ]] )
-        then
-            # -Fehlermeldung ausgeben und Skript beenden:
-            fncECHOlxD "$txtKOPF"
-            fncECHOlxD "$checkDIALOGfehler"
-            fncECHOlxD "|-"
-            #kdialog --title="FEHLER" --error="$checkDIALOGfehler"
-            exit 0;
-        fi
-        # -DEBUG:
-        #fncECHOlx "|--- $debugWERT"
-    }
 
 
     fncMimeTypeAuswahl
@@ -1480,14 +1526,14 @@ else
     
     fncEXTENSIONziel
     
-    if ( [[ "$extensionZIELCASEUP" == "MP4" ]] )
-    then
-        # -Ausgabe Optionen für MP4 abfragen:
-        fncOPTIONENziel
-        optionenZIELaktuell="$optionenZIEL"
-    else
-        optionenZIELaktuell="$optionenZIELstandard"
-    fi
+#     if ( [[ "$extensionZIELCASEUP" == "MP4" ]] )
+#     then
+#         # -Ausgabe Optionen für MP4 abfragen:
+#         fncOPTIONENziel
+#         optionenZIELaktuell="$optionenZIEL"
+#     else
+#         optionenZIELaktuell="$optionenZIELstandard"
+#     fi
     
 #     fncECHOlx "|- Quellverzeichnis:\\t$eingabeQUELLEkomplett"
 #     fncECHOlx "|- Dateityp Auswahl:\\t$MimeTypeAuswahl"
@@ -1495,23 +1541,36 @@ else
 #     fncECHOlx "|- Dateiformat Ziel:\\t$extensionZIEL"
 #     fncECHOlx "|- Optionen Ziel:\\t$optionenZIEL"
 #     fncECHOlx "|- Sicherheitskopie:\\t$flagBAKaction"
-    #exit 0;
-    
-
 
 fi
-# ----- ENDE if Argumente aus Kommandozeile -----------------------------------
+# ----- ENDE if Argumente aus Befehlszeile -----------------------------------
 # -----------------------------------------------------------------------------
 
 
 
+if ( [[ "$flagAUFRUFintern" == "false" ]] )
+then
+    if ( [[ "$extensionZIELCASEUP" == "MP4" ]] )
+    then
+        fncMimeTypeFromExtension "$extension"
+        #kdialog --title "DEBUG Info" --msgbox "flagAUFRUFintern: false<br>extensionZIELCASEUP: MP4<br><br><hr>MimeType: $MimeTypeAuswahl<hr>"
+        # -Ausgabe Optionen für MP4 abfragen:
+        fncOPTIONENziel
+        optionenZIELaktuell="$optionenZIEL"
+    else
+        optionenZIELaktuell="$optionenZIELstandard"
+    fi
+else
+    # -Interner Aufruf:
+    optionenZIEL="$optionenZIELglobal"
+    optionenZIELaktuell="$optionenZIEL"
+fi
 
 
 
 
 
-
-# -Fehlende Werte bei komplettem Aufruf über die Kommandozeile festlegen:
+# -Fehlende Werte bei komplettem Aufruf über die Befehlszeile festlegen:
 # --$MimeTypeAuswahl
 # --$optionenZIEL
 
@@ -2134,6 +2193,21 @@ function fncCHECKtaste {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 function fncFFMPEGbefehlAUFLOESUNGFRAMERATE {
     i=$1
     # -HD Standard Werte:
@@ -2142,6 +2216,7 @@ function fncFFMPEGbefehlAUFLOESUNGFRAMERATE {
     intMAXframerate=30
     intMAXbitrate=1500000
     
+    [[ "$optionenZIEL" == *25fps* ]] && intMAXframerate=25
     #fncDEBUGstart
     
     # -Dateiname ohne Pfad:
@@ -2243,6 +2318,16 @@ function fncFFMPEGbefehlAUFLOESUNGFRAMERATE {
 
 
 
+
+
+
+
+
+
+
+
+
+
 # -------------------------------------------------------------------------------------------------
 # ----- START fncFFMPEG ---------------------------------------------------------------------------
 intDauerDateiKomplett=""
@@ -2259,8 +2344,8 @@ function fncFFMPEG {
     #fncECHOlx "|-"
     #fncECHOlx "|- "`fncHHMMSS`" INFO "\ "+- ffmpeg: Quelle: $2 - Ziel: $3 mit TXTBOX.Name.Dauer - $strFERTIGdateiNAME"
     #fncECHOlx "|- "`fncHHMMSS`" INFO "\ "+- $intID: Quelle: $2 - Ziel: $3 mit TXTBOX.Name.Dauer - $strFERTIGdateiNAME"
-    
-    fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: -+- Datei: $strFERTIGdateiNAME"
+
+    fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "++ Datei: $strFERTIGdateiNAME"
     #fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- Quelle: $2 - Ziel: $3 mit TXTBOX.Name.Dauer - $strFERTIGdateiNAME"
     
     # -Das Display Management System wird abgeschaltet, wegen Problemen mit dem Passivepopup.
@@ -2425,7 +2510,7 @@ function fncFFMPEG {
     # ... return true
     # }
     #cpulimit -q -z -c 2 -l 80 -p $checkBEFEHLpid &
-    cpulimit -p $checkBEFEHLpid -q -z -c 2 -l 60 &
+    cpulimit -p $checkBEFEHLpid -q -z -c 4 -l 60 &
     fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- Quelle: $2 - Ziel: $3 - PID: $checkBEFEHLpid"
     
     
@@ -2450,7 +2535,7 @@ function fncFFMPEG {
     #fncECHOlx "|- "`fncHHMMSS`" INFO "\ "+- ffmpeg: Befehl wird ausgeführt... - Abbrechen: 'q' - Statusinfo: 'i'"
     #fncECHOlx "|- "`fncHHMMSS`" INFO "\ "+- $intID: Befehl wird ausgeführt... - Abbrechen: 'q' - Statusinfo: 'i'"
     #fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- Befehl wird ausgeführt... - Optionen: i, h (Hilfe), f, w, q, e"
-    fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: -+- Befehl wird ausgeführt... - Optionen: i, h (Hilfe), f, w, q, e"
+    fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- Befehl wird ausgeführt... - Optionen: i, h (Hilfe), f, w, q, e"
     
     #kdialog --title "DEBUG.$datei.nachFFMPEG" --passivepopup "--- ffmpeg PID: $checkBEFEHLpid<br><br>--- Taste: $eingabeTASTE" 10 --geometry=260x100 &
     
@@ -2663,10 +2748,11 @@ function fncFFMPEG {
             [[ "$flagBAKaction" == "uvz" ]] && [[ ! -d "$iQUELLE$BAKuvz" ]] && mkdir $iQUELLE$BAKuvz
             [[ "$flagBAKaction" == "uvz" ]] && mv $quelleBAK $iQUELLE$BAKuvz"/"`fncDATEIohnePFAD $quelleBAK` && fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- Quelldatei wurde erfolgreich im Unterverzeichnis ($BAKuvz) gesichert! - `fncDATEIohnePFAD $quelleBAK`"
             #fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ ">> Befehl wurde erfolgreich beendet! - `fncDATEIohnePFAD $strFERTIGdateiPFAD`"
-            fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: -+> Befehl wurde erfolgreich beendet! - `fncDATEIohnePFAD $strFERTIGdateiPFAD`"
+            fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "-- Befehl wurde erfolgreich beendet! - `fncDATEIohnePFAD $strFERTIGdateiPFAD`"
         fi
         #[ $iaLSarrayZZ -lt $iaLSarrayANZAHL ] && fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "--"
-        [ $iaLSarrayZZ -lt $iaLSarrayANZAHL ] && fncECHOlx "|- "`fncHHMMSS`
+        #[ $iaLSarrayZZ -lt $iaLSarrayANZAHL ] && fncECHOlx "|- "`fncHHMMSS`
+        [ $iaLSarrayZZ -eq $iaLSarrayANZAHL ] && fncECHOlx "|- "`fncHHMMSS`
         fncECHOlx "|- "`fncHHMMSS`
     else
         exec >`tty` 2>&1
@@ -2709,7 +2795,19 @@ for iQUELLE in "${eingabeQUELLEarray[@]}"
 do
     [[ "$iQUELLE" != */ ]] && iQUELLE=$iQUELLE"/"
     [[ "$flagAUFRUFintern" != "true" ]] && dateiLOGS="$iQUELLE""$dateiLOGSohnePFAD" && dateiLOGSsicherung="$iQUELLE""$dateiLOGSsicherungOriginal"
-    [[ "$flagAUFRUFintern" == "true" ]] && dateiLOGS="$dateiLOGSglobal"
+
+
+
+    # ---------------------------------------------------------------------------------------------
+    # ----- SONDERFALL: interner Aufruf - globale Variablen anpassen ------------------------------
+    # ---------------------------------------------------------------------------------------------
+    [[ "$flagAUFRUFintern" == "true" ]] && dateiLOGS="$dateiLOGSglobal" && optionenZIEL="$optionenZIELglobal" && flagTESTDRIVE="$flagTESTDRIVEglobal"
+    # ---------------------------------------------------------------------------------------------
+    # ---------------------------------------------------------------------------------------------
+    # ---------------------------------------------------------------------------------------------
+
+
+
     dateiTESTMODEls="$iQUELLE$dateiTESTMODElsOriginal"
     dateiCACHEcheckFNC="$iQUELLE""$dateiCACHEcheckFNCOriginal"
     dateiCACHEflagENDE="$iQUELLE""$dateiCACHEflagENDEOriginal"
@@ -2802,13 +2900,20 @@ do
     done
     
     
+
+
+
+
+
+
+
+
+
+    # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     # -Alte FOR Variante: als Array
     #for ia in "${iaLSarray[@]}"
-    
-    
-    
-    # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    #
     # -Neue FOR Variante: suchpfadDATEIEN
     for ia in $suchpfadDATEIEN
     do
@@ -2825,15 +2930,18 @@ do
         strFERTIGdateiNAME=${i_Dateiname//.$extensionQuelleAktuell/$extensionZIEL}
         strFERTIGcommentEXT=${extensionQuelleAktuell//./}"->"${extensionZIEL//./}
         strFERTIGcommentHD=""
-        [[ "$optionenZIEL" == *HD* ]] && strFERTIGcommentHD="HD-Optimierung"
-        [[ "$strFERTIGcommentHD" != "" ]] && strFERTIGcommentHD="$strFERTIGcommentHD""_"
+        [[ "$optionenZIEL" == *HD* ]] && strFERTIGcommentHD=".HD"
+        #[[ "$strFERTIGcommentHD" != "" ]] && strFERTIGcommentHD="$strFERTIGcommentHD""_"
         strFERTIGcommentTXTBOX=""
         [[ "$optionenZIEL" == *txtNAME ]] && strFERTIGcommentTXTBOX="TXTBOX.Name"
         [[ "$optionenZIEL" == *txtDAUER ]] && strFERTIGcommentTXTBOX="TXTBOX.Dauer"
         [[ "$optionenZIEL" == *txtNAMEtxtDAUER ]] && strFERTIGcommentTXTBOX="TXTBOX.Name.Dauer"
-        [[ "$strFERTIGcommentTXTBOX" != "" ]] && strFERTIGcommentTXTBOX="_""$strFERTIGcommentTXTBOX"
+        [[ "$strFERTIGcommentTXTBOX" != "" ]] && strFERTIGcommentTXTBOX=".""$strFERTIGcommentTXTBOX"
+
         strFERTIGcomment="[`fncYEAR1231 nurZAHLEN`-`fncHHMMSS nurZAHLEN`_$datei:$strFERTIGcommentHD""$strFERTIGcommentEXT""$strFERTIGcommentTXTBOX]"
-        
+
+        strFERTIGcomment="$datei"."$strFERTIGcommentEXT""$strFERTIGcommentHD""$strFERTIGcommentTXTBOX""[`fncYEAR1231 nurZAHLEN`.`fncHHMMSS nurZAHLEN`]"
+
         # DEBUG infos:
         #echo -e "---"
         #echo -e "DEBUG DATEIEN flagAUFRUFintern: $flagAUFRUFintern"
@@ -2850,7 +2958,7 @@ do
             #[[ "$iQUELLE$ia" == *$extensionZIEL ]] && continue
             
             #[ $intIDfortlaufend -eq 0 ] && [[ "$flagAUFRUFintern" != "true" ]] && fncECHOlx "|-"
-            [ $intIDfortlaufend -eq 0 ] && [[ "$flagAUFRUFintern" != "true" ]] && fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: -+- Verzeichnis: $iQUELLE"
+            [ $intIDfortlaufend -eq 0 ] && [[ "$flagAUFRUFintern" != "true" ]] && fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: +++ Verzeichnis: $iQUELLE"
             [ $intIDfortlaufend -eq 0 ] && [[ "$flagTESTMODEliste" == "true" ]] && echo -e "$iQUELLE" >> $dateiTESTMODEls
             flagLAYOUTtrennzeile="true"
             
@@ -2893,10 +3001,24 @@ do
             [[ "$txtBEFEHLaufloesung" != "" ]] && [[ "$txtBEFEHLframerate" == "" ]] && checkBefehlAufloesungFramerate="WxH-1.Fps-0"
             [[ "$txtBEFEHLaufloesung" == "" ]] && [[ "$txtBEFEHLframerate" != "" ]] && checkBefehlAufloesungFramerate="WxH-0.Fps-1"
             [[ "$txtBEFEHLaufloesung" != "" ]] && [[ "$txtBEFEHLframerate" != "" ]] && checkBefehlAufloesungFramerate="WxH-1.Fps-1"
-            
-#             fncECHOlx "|- DEBUG --- Quelle Kommentar: $quelleCOMMENT \\tOptionen Ziel: $optionenZIEL"
-#             fncECHOlx "|- DEBUG --- BEFEHL Auflösung - Framerate: $txtBEFEHLaufloesung - $txtBEFEHLframerate"
-            if ( ( [[ "$quelleCOMMENT" == *txtbox.name.dauer* ]] || [[ "$optionenZIEL" != *txt* ]] ) && [[ "$txtBEFEHLaufloesung" == "" ]] && [[ "$txtBEFEHLframerate" == "" ]] && [[ "$extensionCASEUP" == "$extensionZIELCASEUP" ]] && [[ "$optionenZIEL" != *codecsCOPY* ]] )
+
+            # -UVZ Extension Bug: Der führende Punkt muss entfernt werden!
+            #  $extensionCASEUP hat KEINEN führenden Punkt (avi,wav,mp3,...)
+            #  $extensionZIELCASEUP hat EINEN führenden Punkt (.avi,.wav,.mp3,...)
+            [[ "$extensionZIELCASEUP" == .* ]] && extensionZIELCASEUP="${extensionZIELCASEUP//./}"
+
+#             fncECHOlx "--- DEBUG Info:"
+#             fncECHOlx "--- DEBUG Info: $pfadDATEI"
+#             fncECHOlx "--- DEBUG Info: flagAUFRUFintern $flagAUFRUFintern \\t| checkBefehl $checkBefehlAufloesungFramerate"
+#             fncECHOlx "--- DEBUG Info: optionenZIEL $optionenZIEL \\t| optionenZIELglobal $optionenZIELglobal"
+#             fncECHOlx "--- DEBUG Info: quelleCOMMENT $quelleCOMMENT"
+#             fncECHOlx "--- DEBUG Info: txtBEFEHLaufloesung $txtBEFEHLaufloesung \\t| extensionCASEUP $extensionCASEUP"
+#             fncECHOlx "--- DEBUG Info: txtBEFEHLframerate $txtBEFEHLframerate \\t| extensionZIELCASEUP $extensionZIELCASEUP"
+
+            #kdialog --title "DEBUG Info" --msgbox "flagAUFRUFintern: false<br>extensionZIELCASEUP: MP4<br><br><hr>MimeType: $MimeTypeAuswahl<hr>"
+
+            #if ( ( [[ "$quelleCOMMENT" == *txtbox.name.dauer* ]] || [[ "$optionenZIEL" != *txt* ]] ) && [[ "$txtBEFEHLaufloesung" == "" ]] && [[ "$txtBEFEHLframerate" == "" ]] && [[ "$extensionCASEUP" == "$extensionZIELCASEUP" ]] && [[ "$optionenZIEL" != *codecsCOPY* ]] )
+            if ( ( [[ "$quelleCOMMENT" == *txtbox.name.dauer* ]] || [[ "$optionenZIEL" != *txt* ]] ) && ( [[ "$txtBEFEHLaufloesung" == "" ]] && [[ "$txtBEFEHLframerate" == "" ]] && [[ "$extensionCASEUP" == "$extensionZIELCASEUP" ]] && [[ "$optionenZIEL" != *codecsCOPY* ]] ) )
             then
                 #txtINFOkeineUMWANDLUNG="Umwandlung nicht erforderlich!"
                 [[ "$optionenZIEL" != *txt* ]] && txtINFOkeineUMWANDLUNG="Umwandlung nicht erforderlich!"
@@ -2905,12 +3027,12 @@ do
                 
                 #fncECHOlx "|- "`fncHHMMSS`" INFO "\ "-> $datei: Datei wurde bereits umgewandelt! - $strFERTIGdateiNAME"
                 #fncECHOlx "|- "`fncHHMMSS`" INFO "\ "-> $intID: Datei wurde bereits umgewandelt! - $strFERTIGdateiNAME"
-                fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "-> $txtINFOkeineUMWANDLUNG - $strFERTIGdateiNAME"
+                fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- $txtINFOkeineUMWANDLUNG - $strFERTIGdateiNAME"
                 # -Abstandhalter Zeile:
                 #[ $iaLSarrayZZ -lt $iaLSarrayANZAHL ] && fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "--"
-                #[ $iaLSarrayZZ -lt $iaLSarrayANZAHL ] && fncECHOlx "|- "`fncHHMMSS`" INFO "\ \ \ ": "\ "--"
-                [ $iaLSarrayZZ -lt $iaLSarrayANZAHL ] && fncECHOlx "|- "`fncHHMMSS`
-                
+                #[ $iaLSarrayZZ -lt $iaLSarrayANZAHL ] && fncECHOlx "|- "`fncHHMMSS`
+                #[ $iaLSarrayZZ -eq $iaLSarrayANZAHL ] && fncECHOlx "|- "`fncHHMMSS`
+
             else
                 nix=1
                 #[[ "$flagTESTDRIVE" != "true" ]] && fncECHOlx "--- DEBUG - $checkBefehlAufloesungFramerate - umwandeln - kein TESTMODE - $pfadDATEI"
@@ -2957,6 +3079,8 @@ do
             break
         fi
     done
+
+
 #     intIDfortlaufend=intIDfortlaufend+1
 #     intID=`printf %03d $intIDfortlaufend`
     if ( [[ "$iaLSarrayANZAHL" -gt 0 ]] )
@@ -2966,18 +3090,25 @@ do
             # -Normaler Aufruf, erfolgreich, also keine Fehler!
             #fncECHOlx "|- `fncHHMMSS` INFO"\ \ \ \ ":"\ \ "+> ERFOLGREICH: $iQUELLE"
             #fncECHOlx "|- `fncHHMMSS` INFO"\ \ \ \ \ \ \ "+> ERFOLGREICH: $iQUELLE"
-            fncECHOlx "|- `fncHHMMSS` INFO $intID$txtAnzahlID: -+> ERFOLGREICH: $iQUELLE"
+            fncECHOlx "|- `fncHHMMSS` INFO $intID$txtAnzahlID: "\ "-> ERFOLGREICH: $iQUELLE"
         else
             # -Normaler Aufruf, nicht erfolgreich, also mit Fehler!
             #fncECHOlx "|- `fncHHMMSS` INFO"\ \ \ \ ":"\ \ "+> FEHLER: $iQUELLE"
             #fncECHOlx "|- `fncHHMMSS` INFO"\ \ \ \ \ \ \ "+> FEHLER: $iQUELLE"
-            fncECHOlx "|- `fncHHMMSS` INFO $intID$txtAnzahlID:"\ \ "+> FEHLER: $iQUELLE"
+            fncECHOlx "|- `fncHHMMSS` INFO $intID$txtAnzahlID: "\ "-> FEHLER: $iQUELLE"
         fi
     fi
     intIDfortlaufend=intIDfortlaufend+1
     intID=`printf %03d $intIDfortlaufend`
     
     
+
+
+
+
+
+
+
     # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     # -Neue FOR Variante: suchpfadVERZEICHNIS
@@ -3019,9 +3150,10 @@ do
 
         if ( [[ -d "$ia" ]] )
         then
-            # --- $ia ohne Pfad ist Unterverzeichnis!!!
-            # -Pfad zum UVZ zusammenbauen:
-            #pfadUVZ=$iQUELLE$ia"/"
+            # -Verzeichnis mit Pfad: $iQUELLE
+            # -Unterverzeichnis mit Pfad: $ia
+            # -Pfad vom UVZ trennen:
+            strUVZohnePfad=${ia//$iQUELLE/}
             # -Prüfen ob im UVZ Dateien mit der richtigen Extension drin sind:
             iaLSarrayUVZ=(`ls $pfadUVZ*$extension 2>/dev/null`)
             iaLSarrayUVZANZAHL=${#iaLSarrayUVZ[@]}
@@ -3037,13 +3169,12 @@ do
                 fncECHOlx "|- "`fncHHMMSS`
             fi
             flagLAYOUTtrennzeile="true"
-            fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: -+- Verzeichnis: $pfadUVZ"
+            #fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "++ Unterverzeichnis: $strUVZohnePfad"
+            fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: ++- Unterverzeichnis: $strUVZohnePfad"
+
             [[ "$flagTESTMODEliste" == "true" ]] && echo -e "$pfadUVZ" >> $dateiTESTMODEls
             
-#             fncECHOlx "|- DEBUG --- UVZ: $pfadUVZ - EXT Quelle: $extension - EXT Ziel: $extensionZIEL"
-#             fncECHOlx "|- DEBUG --- Logdatei: $dateiLOGS - Optionen: $optionenZIEL - Sicherheitskopie: $flagBAKaction"
-#             fncECHOlx "|-"\\n"|- DEBUG --- $*"\\n"|-"
-            #fncECHOlx "|- DEBUG --- BEFEHL Auflösung - Framerate: $txtBEFEHLaufloesung - $txtBEFEHLframerate"
+#             fncECHOlx "--- DEBUG Info: UVZ: $pfadUVZ \\t| Extension: Quelle $extension - Ziel $extensionZIEL"
             $0 "$pfadUVZ" "$extension" "$extensionZIEL" ":flagAUFRUFintern:" "$dateiLOGS" "$optionenZIEL" "$flagBAKaction" "$flagTESTDRIVE"
             # -fncCHECKstatusDOaction:
             [ $? -eq 20 ] && exit 20;

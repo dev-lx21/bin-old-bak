@@ -12,15 +12,22 @@
 #
 # ---------------------------------------------------------------------------------------
 # ---------------------------------------------------------------------------------------
-# [[ -z "$1" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return
+# [[ -z "$1" ]] && echo -e "|- ${FUNCNAME[0]} FEHLER:"\\t"1. Argument nicht angegeben!" && return 11
+# [[ -z "$2" ]] && echo -e "|- ${FUNCNAME[0]} FEHLER:"\\t"2. Argument nicht angegeben!" && return 12
+# -------------------------------------------------------------------------------------------------
+# ----- START -------------------------------------------------------------------------------------
+# ----- ENDE --------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 
 
 
 
 
 
-# ---------------------------------------------------------------------------------------
-# ---------------------------------------------------------------------------------------
+
+
+# -------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 
 function fncDEBUGstart {
     flagFNCdebug="true"
@@ -65,39 +72,41 @@ function fncAUSLESENversion {
     iaLSarrayANZAHL=${#iaLSarray[@]}
     dateiNameKomplett=${iaLSarray[0]}
     dateiVersionKomplett=${iaLSarray[0]}
-    
+
     #  foo/bar/lxDOWNLOAD_2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
-    
+
     # -Bis zum letzten Slash abschneiden:
     dateiVersionKomplett=${dateiVersionKomplett//*\//}
     #  lxDOWNLOAD_2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
-    
+
     # -Dateiname bis Unterstrich abschneiden:
     dateiVersionKomplett=${dateiVersionKomplett//`echo -e $datei`_/}
     #  2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
-    
+
     # -Unterstrich bis zum Ende abschneiden: dateiVersionInfoNr
     dateiVersionInfoNr=${dateiVersionKomplett//_*/}
     #  2.17.05-01-01
-    
+
     # -Bis zum Unterstrich abschneiden: dateiVersionKomplettTxt
     dateiVersionKomplettTxt=${dateiVersionKomplett//$dateiVersionInfoNr\_/}
     #  TODO_einbauen-dateiVersionNrTxt
-    
+
     # -Nur die Kategorie ausschneiden:
     dateiVersionInfoKategorie=${dateiVersionKomplettTxt//_*/}
     #  TODO
-    
-    # -Nur den Infotext ausschneiden: 
+
+    # -Nur den Infotext ausschneiden:
     dateiVersionInfoTxt=${dateiVersionKomplettTxt//$dateiVersionInfoKategorie\_/}
     #  einbauen-dateiVersionNrTxt
-    
+
     dateiVersionInfoNr="$dateiVersionInfoNr"
     dateiVersionInfoKategorie="$dateiVersionInfoKategorie"
     dateiVersionInfoTxt="$dateiVersionInfoTxt"
-    
+
 }
-[ -z $dateiVersionInfoNr ] && fncAUSLESENversion
+[[ ! $dateiVersionInfoNr ]] && fncAUSLESENversion
+[[ -z "$datei" ]] && echo -e "[FEHLER: Variable konnte nicht gelesen werden: 'datei']" && exit 22;
+
 
 
 function fncHHMMSS {
@@ -134,6 +143,9 @@ function fncHHMMSS {
 
 function fncYEAR1231 {
     case "$1" in
+        ( nurZAHLEN )
+            echo -en `date '+%Y%m%d'`
+            ;;
         ( YEAR )
             echo -en `date '+%Y'`
             ;;
@@ -147,10 +159,61 @@ function fncYEAR1231 {
             echo -en `date '+%m%d'`
             ;;
         (*)
-            echo -en `date '+%Y%m%d'`
+            echo -en `date '+%Y-%m-%d'`
             ;;
     esac
 }
+
+function fncANZAHLzeichen {
+    # -Die Anzahl der Zeichen in $1 ermitteln und mittels echo ausgeben!
+    [ ! "$1" ] && echo -e "[Kein Argument übergegeben: fncANZAHLzeichen]" && return 10
+    echo -e "${#1}"
+}
+
+
+txtPLATZHALTER=""
+function fncECHOplatzhalter {
+    # -Die Anzahl der Zeichen in $1 ermitteln und damit eine Linie als
+    #  PLATZHALTER erstellen!
+    # -ZeichenRandUhrzeit: "|- [09:31:37] "
+    # -Maximale Gesamtzeichenanzahl:
+    #  intZZmax=intLayoutMaxSpalten-intAnzahlZeichenRandUhrzeit
+    # -Am Ende werden $1 und $txtPLATZHALTER gemeinsam ausgegeben.
+    #  --------------------------------------------------------------------------------
+    txtPLATZHALTER=""
+    txtLEERZEICHEN=""
+    typeset -i intZZmax=0
+    typeset -i intZZplatzhalter=0
+    [ ! "$1" ] && intZZplatzhalter=$intZZmax
+
+    # -WICHTIG: Der Platzhalter wird mit der maximalen Länge erstellt und in die Logdatei
+    #  geschrieben. Bei der Ausgabe in den dynamischen Statuszeilen wird die Länge kontrolliert
+    #  und ggf korrigiert. Siehe intSTATUSzeichenMAX.
+    intZZmax=$intLayoutMaxSpalten
+
+    #echo -e "${#1}"
+    # -Damit zwischen $1 und $txtPLATZHALTER genau 1 Leerzeichen ist,
+    #  wird das letzte Zeichen von $1 entsprechend ausgeschnitten und
+    #  überprüft:
+    [ "$1" ] && [ -n "${1: -1}" ] && txtLEERZEICHEN=" "
+    [ "$1" ] && intZZplatzhalter=intZZmax-${#1}-${#txtLEERZEICHEN}
+    # -Den Platzhalter mittels Schleife zusammenbauen:
+    while ( [[ $intZZplatzhalter -gt 0 ]] )
+    do
+        txtPLATZHALTER=$txtPLATZHALTER"-"
+        intZZplatzhalter=intZZplatzhalter-1
+    done
+    # -$1 und $PLATZHALTER direkt ausgeben:
+    echo -e "$1""$txtLEERZEICHEN""$txtPLATZHALTER"
+}
+
+
+
+
+
+
+
+
 
 function fncTime2SekSek2Time {
     # -Zeitangaben vereinfacht umrechnen: 

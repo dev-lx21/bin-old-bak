@@ -2,7 +2,6 @@
 # script von -lx-
 
 
-
 # ---------------------------------------------------------------------------------------
 # ---------------------------------------------------------------------------------------
 # ----- ToDo:
@@ -13,12 +12,100 @@
 #
 # ---------------------------------------------------------------------------------------
 # ---------------------------------------------------------------------------------------
-# [[ -z "$1" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return
+# [[ -z "$1" ]] && echo -e "|- ${FUNCNAME[0]} FEHLER:"\\t"1. Argument nicht angegeben!" && return 11
+# [[ -z "$2" ]] && echo -e "|- ${FUNCNAME[0]} FEHLER:"\\t"2. Argument nicht angegeben!" && return 12
+# -------------------------------------------------------------------------------------------------
+# ----- START -------------------------------------------------------------------------------------
+# ----- ENDE --------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 
 
 
 
 
+
+
+
+# -------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+function fncDEBUGstart {
+    flagFNCdebug="true"
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    echo -e "--------------------------------------------------------------------------------"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - START Debug: $txtDEBUGtitel"
+    PS4='+ ${LINENO}:'`echo -en '\\t'`
+    set -x
+}
+
+function fncDEBUGstop {
+    # -Damit fncDEBUGstop nur ausgeführt wird, wenn vorher fncDEBUGstart aufgerufen wurde.
+    [ ! "$flagFNCdebug" ] && return
+    set +x
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - ENDE Debug: $txtDEBUGtitel"
+    echo -e "--------------------------------------------------------------------------------"
+}
+
+
+function fncClearX {
+    # -Da 'clear -x' einen Bug hat und deshalb den sichtbaren Teil der letzten
+    #  Befehle einfach löscht, werden soviele leere Zeilen ausgegeben, wie der
+    #  Bildschirm Zeilen hat.
+    # -Beim Aufruf von 'clear -x' löscht der Befehl dann diese leeren Zeilen
+    #  und die History wird nicht überschrieben.
+    typeset -i intAnzahlScreenZeilen=$(tput lines)
+    for ((iZeilen=1; iZeilen<$intAnzahlScreenZeilen; iZeilen++))
+    do
+        echo -e "$iZeilen"
+    done
+    clear -x
+}
+
+
+dateiVersionInfoNr=""
+function fncAUSLESENversion {
+    [ -z $datei ] && datei=${0//*\//}
+    [ -z $nutzer ] && nutzer=`ps --pid $$ -o user=` && [[ "$nutzer" == "root" ]] && nutzer=`id -un 1000`
+    strVERZEICHNISbin="/home/$nutzer/bin-bak/"
+    iaLSarray=(`ls -r $strVERZEICHNISbin$datei"_"* 2>/dev/null`)
+    iaLSarrayANZAHL=${#iaLSarray[@]}
+    dateiNameKomplett=${iaLSarray[0]}
+    dateiVersionKomplett=${iaLSarray[0]}
+
+    #  foo/bar/lxDOWNLOAD_2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+
+    # -Bis zum letzten Slash abschneiden:
+    dateiVersionKomplett=${dateiVersionKomplett//*\//}
+    #  lxDOWNLOAD_2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+
+    # -Dateiname bis Unterstrich abschneiden:
+    dateiVersionKomplett=${dateiVersionKomplett//`echo -e $datei`_/}
+    #  2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+
+    # -Unterstrich bis zum Ende abschneiden: dateiVersionInfoNr
+    dateiVersionInfoNr=${dateiVersionKomplett//_*/}
+    #  2.17.05-01-01
+
+    # -Bis zum Unterstrich abschneiden: dateiVersionKomplettTxt
+    dateiVersionKomplettTxt=${dateiVersionKomplett//$dateiVersionInfoNr\_/}
+    #  TODO_einbauen-dateiVersionNrTxt
+
+    # -Nur die Kategorie ausschneiden:
+    dateiVersionInfoKategorie=${dateiVersionKomplettTxt//_*/}
+    #  TODO
+
+    # -Nur den Infotext ausschneiden:
+    dateiVersionInfoTxt=${dateiVersionKomplettTxt//$dateiVersionInfoKategorie\_/}
+    #  einbauen-dateiVersionNrTxt
+
+    dateiVersionInfoNr="$dateiVersionInfoNr"
+    dateiVersionInfoKategorie="$dateiVersionInfoKategorie"
+    dateiVersionInfoTxt="$dateiVersionInfoTxt"
+
+}
+[[ ! $dateiVersionInfoNr ]] && fncAUSLESENversion
+[[ -z "$datei" ]] && echo -e "[FEHLER: Variable konnte nicht gelesen werden: 'datei']" && exit 22;
 
 
 
@@ -56,6 +143,9 @@ function fncHHMMSS {
 
 function fncYEAR1231 {
     case "$1" in
+        ( nurZAHLEN )
+            echo -en `date '+%Y%m%d'`
+            ;;
         ( YEAR )
             echo -en `date '+%Y'`
             ;;
@@ -69,26 +159,54 @@ function fncYEAR1231 {
             echo -en `date '+%m%d'`
             ;;
         (*)
-            echo -en `date '+%Y%m%d'`
+            echo -en `date '+%Y-%m-%d'`
             ;;
     esac
 }
 
-dateiVERSION=""
-function fncAUSLESENversion {
-    [ -z $nutzer ] && nutzer=`ps --pid $$ -o user=` && [[ "$nutzer" == "root" ]] && nutzer=`id -un 1000`
-    strVERZEICHNISbin="/home/$nutzer/bin-bak/"
-    iaLSarray=(`ls -r $strVERZEICHNISbin$datei"_"* 2>/dev/null`)
-    iaLSarrayANZAHL=${#iaLSarray[@]}
-    dateiVERSIONkomplett=${iaLSarray[0]}
-    # -Bis zum letzten Slash abschneiden:
-    dateiVERSIONkomplett=${dateiVERSIONkomplett//*\//}
-    # -Dateiname bis Unterstrich abschneiden:
-    dateiVERSIONkomplett=${dateiVERSIONkomplett//`echo -e $datei`_/}
-    # -Unterstrich bis zum Ende abschneiden:
-    dateiVERSIONkomplett=${dateiVERSIONkomplett//_*/}
-    dateiVERSION="($dateiVERSIONkomplett)"
+function fncANZAHLzeichen {
+    # -Die Anzahl der Zeichen in $1 ermitteln und mittels echo ausgeben!
+    [ ! "$1" ] && echo -e "[Kein Argument übergegeben: fncANZAHLzeichen]" && return 10
+    echo -e "${#1}"
 }
+
+
+txtPLATZHALTER=""
+function fncECHOplatzhalter {
+    # -Die Anzahl der Zeichen in $1 ermitteln und damit eine Linie als
+    #  PLATZHALTER erstellen!
+    # -ZeichenRandUhrzeit: "|- [09:31:37] "
+    # -Maximale Gesamtzeichenanzahl:
+    #  intZZmax=intLayoutMaxSpalten-intAnzahlZeichenRandUhrzeit
+    # -Am Ende werden $1 und $txtPLATZHALTER gemeinsam ausgegeben.
+    #  --------------------------------------------------------------------------------
+    txtPLATZHALTER=""
+    txtLEERZEICHEN=""
+    typeset -i intZZmax=0
+    typeset -i intZZplatzhalter=0
+    [ ! "$1" ] && intZZplatzhalter=$intZZmax
+
+    # -WICHTIG: Der Platzhalter wird mit der maximalen Länge erstellt und in die Logdatei
+    #  geschrieben. Bei der Ausgabe in den dynamischen Statuszeilen wird die Länge kontrolliert
+    #  und ggf korrigiert. Siehe intSTATUSzeichenMAX.
+    intZZmax=$intLayoutMaxSpalten
+
+    #echo -e "${#1}"
+    # -Damit zwischen $1 und $txtPLATZHALTER genau 1 Leerzeichen ist,
+    #  wird das letzte Zeichen von $1 entsprechend ausgeschnitten und
+    #  überprüft:
+    [ "$1" ] && [ -n "${1: -1}" ] && txtLEERZEICHEN=" "
+    [ "$1" ] && intZZplatzhalter=intZZmax-${#1}-${#txtLEERZEICHEN}
+    # -Den Platzhalter mittels Schleife zusammenbauen:
+    while ( [[ $intZZplatzhalter -gt 0 ]] )
+    do
+        txtPLATZHALTER=$txtPLATZHALTER"-"
+        intZZplatzhalter=intZZplatzhalter-1
+    done
+    # -$1 und $PLATZHALTER direkt ausgeben:
+    echo -e "$1""$txtLEERZEICHEN""$txtPLATZHALTER"
+}
+
 
 
 
@@ -204,7 +322,7 @@ function fncKILLallePROZESSE {
                         fi
                     fi
                     ausgabeCHILDPIDsTMP=`ps --ppid ${arrLISTEpid[$zL]} -o pid=`
-                    if ( [[ $ausgabeCHILDPIDsTMP != "" ]] )
+                    if ( [[ "$ausgabeCHILDPIDsTMP" != "" ]] )
                     then
                         #echo -en " CPIDs: "$ausgabeCHILDPIDsTMP" --- "
                         echo -en " CPIDs: "$ausgabeCHILDPIDsTMP
@@ -212,6 +330,12 @@ function fncKILLallePROZESSE {
                     fi
                     zL=zL+3
                     echo -en "\\n"
+                    if ( [[ "$ausgabeCHILDPIDsTMP" != "" ]] )
+                    then
+                        #ps -lh $ausgabeCHILDPIDsTMP
+                        ps -o pid= -o comm= $ausgabeCHILDPIDsTMP
+                    fi
+                    echo -e "|-"
                 done
                 
                 if ( [[ "$ausgabePIDsTMP" != "" ]] || [[ "$ausgabeCHILDPIDsTMP" != "" ]] )

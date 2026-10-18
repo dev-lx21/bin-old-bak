@@ -3,7 +3,7 @@
 
 
 # -------------------------------------------------------------------------------------
-# -mp4 dateien deren aufloesung kleiner als 1280x720 ist erkennen
+# -mp4 dateien deren aufloesung kleiner als $intAufloesungMindestWidth""x""$intAufloesungMindestHeight ist erkennen
 # -dateien in tmp verzeichnis verschieben, dabei allerdings die struktur
 #  der unterVerzeichnisse erhalten
 # -------------------------------------------------------------------------------------
@@ -152,6 +152,11 @@ dateiLOGStmp="00_$datei.LOGS.txt.tmp"
 
 
 
+typeset -i intAufloesungMindestWidth=640
+typeset -i intAufloesungMindestHeight=360
+
+
+
 txtHR="|--------------------------------------------------------------------------------"
 txtKOPF=\
 "|--------------------------------------------------------------------------------"\\n\
@@ -174,7 +179,7 @@ txtBENUTZUNG="|- Benutzung: \\n|- '$datei [OPTION] [PFAD]'\\n"\
 "|-"
 
 
-txtHILFE="|- Das Skript sucht nach Videodateien deren Auflösung kleiner als 1280x720 ist und\\n"\
+txtHILFE="|- Das Skript sucht nach Videodateien deren Auflösung kleiner als $intAufloesungMindestWidth""x""$intAufloesungMindestHeight ist und\\n"\
 "|- verschiebt diese in ein TMP Verzeichnis. Dabei wird auch die entsprechende Struktur\\n"\
 "|- der Unterverzeichnisse erstellt, um das Zurück-Verschieben zu vereinfachen.\\n"\
 "|-\\n"\
@@ -763,7 +768,7 @@ function CheckResolutionMkdirMove {
         iNURdateinameAUSGABE=$iNURdateiname
     fi
     
-    if ( [[ $i_width -lt 1280 ]] || [[ $i_height -lt 720 ]] && [[ $iNURdateiname != *_FAV.* ]] )
+    if ( [[ $i_width -lt $intAufloesungMindestWidth ]] || [[ $i_height -lt $intAufloesungMindestHeight ]] && [[ $iNURdateiname != *_FAV.* ]] )
         then
         #echoCHECK -e "|-"
         # DEBUG-INFOS:
@@ -900,13 +905,13 @@ function CheckVideoConvert {
     txtBEFEHLaufloesung=""
     txtBEFEHLframerate=""
     
-    if ( [ "$i_width" -gt 1280 ] || [ "$i_height" -gt 720 ] )
+    if ( [ "$i_width" -gt $intAufloesungMindestWidth ] || [ "$i_height" -gt $intAufloesungMindestHeight ] )
     then
         # seitenverhaeltnis ermitteln und beibehalten
         # varINT=`echo -e "(8+5)*2" | bc`
         verhaeltnis=`echo -e "$i_width/$i_height" | bc -l`
-        max_width=1280
-        max_height=`echo -e "scale=0 ; 1280/$verhaeltnis" | bc -l`
+        max_width=$intAufloesungMindestWidth
+        max_height=`echo -e "scale=0 ; $intAufloesungMindestWidth/$verhaeltnis" | bc -l`
         max_height_check=`echo -e "scale=1 ; $max_height/2" | bc -l`
         #echo -e "--- max_height: $max_height --- max_height_check: $max_height_check"
         if ( [[ "$max_height_check" != *.0 ]] )
