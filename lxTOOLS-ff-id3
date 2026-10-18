@@ -1,0 +1,442 @@
+#!/bin/bash
+# skript von -lx-
+
+
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+# ----- ToDo:
+#
+# ----- DONE:
+#
+# ----- Bugs:
+#
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+# [[ -z "$1" ]] && echo -e "|- ${FUNCNAME[0]} FEHLER:"\\t"1. Argument nicht angegeben!" && return 11
+# [[ -z "$2" ]] && echo -e "|- ${FUNCNAME[0]} FEHLER:"\\t"2. Argument nicht angegeben!" && return 12
+# -------------------------------------------------------------------------------------------------
+# ----- START -------------------------------------------------------------------------------------
+# ----- ENDE --------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+
+
+
+# -------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+function fncDEBUGstart {
+    flagFNCdebug="true"
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    echo -e "--------------------------------------------------------------------------------"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - START Debug: $txtDEBUGtitel"
+    PS4='+ ${LINENO}:'`echo -en '\\t'`
+    set -x
+}
+
+function fncDEBUGstop {
+    # -Damit fncDEBUGstop nur ausgeführt wird, wenn vorher fncDEBUGstart aufgerufen wurde.
+    [ ! "$flagFNCdebug" ] && return
+    set +x
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - ENDE Debug: $txtDEBUGtitel"
+    echo -e "--------------------------------------------------------------------------------"
+}
+
+
+function fncClearX {
+    # -Da 'clear -x' einen Bug hat und deshalb den sichtbaren Teil der letzten
+    #  Befehle einfach löscht, werden soviele leere Zeilen ausgegeben, wie der
+    #  Bildschirm Zeilen hat.
+    # -Beim Aufruf von 'clear -x' löscht der Befehl dann diese leeren Zeilen
+    #  und die History wird nicht überschrieben.
+    typeset -i intAnzahlScreenZeilen=$(tput lines)
+    for ((iZeilen=1; iZeilen<$intAnzahlScreenZeilen; iZeilen++))
+    do
+        echo -e "$iZeilen"
+    done
+    clear -x
+}
+
+
+dateiVersionInfoNr=""
+function fncAUSLESENversion {
+    [ -z $datei ] && datei=${0//*\//}
+    [ -z $nutzer ] && nutzer=`ps --pid $$ -o user=` && [[ "$nutzer" == "root" ]] && nutzer=`id -un 1000`
+    strVERZEICHNISbin="/home/$nutzer/bin-bak/"
+    iaLSarray=(`ls -r $strVERZEICHNISbin$datei"_"* 2>/dev/null`)
+    iaLSarrayANZAHL=${#iaLSarray[@]}
+    dateiNameKomplett=${iaLSarray[0]}
+    dateiVersionKomplett=${iaLSarray[0]}
+
+    #  foo/bar/lxDOWNLOAD_2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+
+    # -Bis zum letzten Slash abschneiden:
+    dateiVersionKomplett=${dateiVersionKomplett//*\//}
+    #  lxDOWNLOAD_2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+
+    # -Dateiname bis Unterstrich abschneiden:
+    dateiVersionKomplett=${dateiVersionKomplett//`echo -e $datei`_/}
+    #  2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+
+    # -Unterstrich bis zum Ende abschneiden: dateiVersionInfoNr
+    dateiVersionInfoNr=${dateiVersionKomplett//_*/}
+    #  2.17.05-01-01
+
+    # -Bis zum Unterstrich abschneiden: dateiVersionKomplettTxt
+    dateiVersionKomplettTxt=${dateiVersionKomplett//$dateiVersionInfoNr\_/}
+    #  TODO_einbauen-dateiVersionNrTxt
+
+    # -Nur die Kategorie ausschneiden:
+    dateiVersionInfoKategorie=${dateiVersionKomplettTxt//_*/}
+    #  TODO
+
+    # -Nur den Infotext ausschneiden:
+    dateiVersionInfoTxt=${dateiVersionKomplettTxt//$dateiVersionInfoKategorie\_/}
+    #  einbauen-dateiVersionNrTxt
+
+    dateiVersionInfoNr="$dateiVersionInfoNr"
+    dateiVersionInfoKategorie="$dateiVersionInfoKategorie"
+    dateiVersionInfoTxt="$dateiVersionInfoTxt"
+
+}
+[[ ! $dateiVersionInfoNr ]] && fncAUSLESENversion
+[[ -z "$datei" ]] && echo -e "[FEHLER: Variable konnte nicht gelesen werden: 'datei']" && exit 22;
+
+
+
+function fncHHMMSS {
+    case "$1" in
+        ( nurZAHLEN )
+            echo -en `date '+%H%M%S'` ;;
+        ( nurSS )
+            echo -en `date '+%S'` ;;
+        ( nurSS.S )
+            echo -en `date '+%S.%N'` ;;
+        ( nurSS.mS3 )
+            HMSmS=`date '+%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:3}
+            echo -en $HMSxyz"."$mSxyz ;;
+        ( norm.mS2 )
+            HMSmS=`date '+%H:%M:%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:2}
+            echo -en $HMSxyz"."$mSxyz ;;
+        ( norm.mS3 )
+            HMSmS=`date '+%H:%M:%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:3}
+            echo -en $HMSxyz"."$mSxyz ;;
+        (*)
+            echo -en `date '+%H:%M:%S'` ;;
+    esac
+    #echo -en `date '+%H:%M:%S'`
+}
+
+function fncYEAR1231 {
+    case "$1" in
+        ( nurZAHLEN )
+            echo -en `date '+%Y%m%d'`
+            ;;
+        ( YEAR )
+            echo -en `date '+%Y'`
+            ;;
+        ( 12 )
+            echo -en `date '+%m'`
+            ;;
+        ( 31 )
+            echo -en `date '+%d'`
+            ;;
+        ( 1231 )
+            echo -en `date '+%m%d'`
+            ;;
+        (*)
+            echo -en `date '+%Y-%m-%d'`
+            ;;
+    esac
+}
+
+function fncANZAHLzeichen {
+    # -Die Anzahl der Zeichen in $1 ermitteln und mittels echo ausgeben!
+    [ ! "$1" ] && echo -e "[Kein Argument übergegeben: fncANZAHLzeichen]" && return 10
+    echo -e "${#1}"
+}
+
+
+txtPLATZHALTER=""
+function fncECHOplatzhalter {
+    # -Die Anzahl der Zeichen in $1 ermitteln und damit eine Linie als
+    #  PLATZHALTER erstellen!
+    # -ZeichenRandUhrzeit: "|- [09:31:37] "
+    # -Maximale Gesamtzeichenanzahl:
+    #  intZZmax=intLayoutMaxSpalten-intAnzahlZeichenRandUhrzeit
+    # -Am Ende werden $1 und $txtPLATZHALTER gemeinsam ausgegeben.
+    #  --------------------------------------------------------------------------------
+    txtPLATZHALTER=""
+    txtLEERZEICHEN=""
+    typeset -i intZZmax=0
+    typeset -i intZZplatzhalter=0
+    [ ! "$1" ] && intZZplatzhalter=$intZZmax
+
+    # -WICHTIG: Der Platzhalter wird mit der maximalen Länge erstellt und in die Logdatei
+    #  geschrieben. Bei der Ausgabe in den dynamischen Statuszeilen wird die Länge kontrolliert
+    #  und ggf korrigiert. Siehe intSTATUSzeichenMAX.
+    intZZmax=$intLayoutMaxSpalten
+
+    #echo -e "${#1}"
+    # -Damit zwischen $1 und $txtPLATZHALTER genau 1 Leerzeichen ist,
+    #  wird das letzte Zeichen von $1 entsprechend ausgeschnitten und
+    #  überprüft:
+    [ "$1" ] && [ -n "${1: -1}" ] && txtLEERZEICHEN=" "
+    [ "$1" ] && intZZplatzhalter=intZZmax-${#1}-${#txtLEERZEICHEN}
+    # -Den Platzhalter mittels Schleife zusammenbauen:
+    while ( [[ $intZZplatzhalter -gt 0 ]] )
+    do
+        txtPLATZHALTER=$txtPLATZHALTER"-"
+        intZZplatzhalter=intZZplatzhalter-1
+    done
+    # -$1 und $PLATZHALTER direkt ausgeben:
+    echo -e "$1""$txtLEERZEICHEN""$txtPLATZHALTER"
+}
+
+
+
+
+
+
+
+echo -e "***************************************************************"
+echo -e "********** album in songs splitten script von -lx- ************"
+echo -e "***************************************************************"
+
+
+
+# infobox aufrufen:
+# bitte moeglichst alle variablen uebergeben:
+#zz_inc_infobox_script-start.sh "Komplettes Album in seine Stücke aufteilen."
+
+
+
+
+
+
+extension=".mp3"
+# gewuenschte laenge der teilstuecke in sekunden, der wert
+# muss glatt durch 60 teilbar sein!!!
+#splitlaenge="300"
+#echo -e "$extension"
+
+# pfad zur trackliste mit den zeiten:
+datei=zz_zeiten.txt
+
+# pfad zur trackliste mit den titeln:
+datei_titel=zz_titel.txt
+
+
+kdialog --title='Dateinamen' --msgbox '== lx-album-split: ==================<br><br>Datei mit den Zeiten:<br>'$datei'<br><br>Datei mit den Titeln:<br>'$datei_titel'<br>' 320 180
+
+# DEBUG-info
+#while read variable
+#do
+  #nix=0 
+  #echo $variable
+#done < $datei
+#exit 0;
+
+
+typeset -i nr=0
+typeset -i z=0
+while read variable_laenge[$z]
+  do
+  txt_laenge[$z]=`echo ${variable_laenge[$z]}`
+  #echo -e "track: nr: $nr laenge: ${txt_laenge[$z]}"
+  z=z+1
+  nr=nr+1
+done < $datei
+#exit 0;
+
+
+# auslesen der titel liste zum spaeteren setzen der ID3 tags;
+typeset -i z=0
+while read variable_titel[$z]
+  do
+  #echo $variable_titel
+  #txttitel$z="$variable_titel"
+  #txttitel$z=`echo $variable_titel`
+  #txtnummer$z=`echo $z`
+
+  #echo -e "track: nr: $z titel: $variable_titel[$z]"
+  #z=$[z+1]
+  z=z+1
+
+#  ffmpeg -i $i -acodec copy -t 00:$variable_titel -ss 00:00:00 $outfile_1`printf _%03d$extension $a`
+#  ffmpeg -i $i -acodec copy -ss 00:$variable_titel -y -acodec libmp3lame -ab 192k "tmp_$i"
+#  rm $i
+#  cp "tmp_$i" $i
+#  rm "tmp_$i"
+  #exit 0;
+done < $datei_titel
+
+
+while ( [ $z -gt 0 ] )
+  do
+  z_index=z-1
+  txt_titel_original[$z_index]=`echo ${variable_titel[$z_index]}`
+  txt_titel=`echo ${variable_titel[$z_index]} | sed 's/ /_/g'`
+  txt_titel[$z_index]=`echo $txt_titel | sed 's/[^abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789()_\-\.\/]//g'`
+  #echo -e "track: nr: $z titel: ${txt_titel[$z_index]} original: ${txt_titel_original[$z_index]}"
+  z=z-1
+done
+
+
+#exit 0;
+
+
+
+
+
+
+
+echo -e "*** Leerzeichen ersetzen: ***"
+for i in *$extension
+ do
+ #echo -e "RENAME $i" | sed "s/ /_/g"
+ echo -e "*** RENAME $i"
+ rename  's/ /_/g' "$i"
+ echo -e "*** ...done"
+done
+
+
+
+
+
+str_vorgabe=${i%$extension}
+str_vorgabe=`echo $str_vorgabe | sed 's/[_\-]/ /g'`
+txt_artist=$(kdialog --title='Name des Künstlers?' --inputbox '== lx-album-split: ==================<br><br>Bitte den Namen des Künstlers oder der Band<br>angeben!<br><br>' "$str_vorgabe" 320 180)
+
+txt_album=$(kdialog --title='Name des Albums?' --inputbox '== lx-album-split: ==================<br><br>Bitte den Namen des Albums angeben!<br><br>' "$str_vorgabe" 320 180)
+
+int_aktuelles_jahr=`date +%Y`
+txt_year_eingabe=1
+str_vorgabe=$int_aktuelles_jahr
+
+while( [[ $txt_year_eingabe -lt 1900 ]] || [[ $txt_year_eingabe -gt $int_aktuelles_jahr ]] )
+#while( [[ $txt_year_eingabe -lt 1800 ]] && [[ $txt_year_eingabe -gt $int_aktuelles_jahr ]] && [[ "$txt_year_eingabe"!="" ]] )
+#while ( [[ "$txt_year_eingabe" != [1-2][0-9][0-9][0-9] ]] && (( "$txt_year_eingabe" > "$int_aktuelles_jahr" )) && [[ "$txt_year_eingabe" != "" ]] )
+#while ( [[ "$txt_year_eingabe" != [1-2][0-9][0-9][0-9] ]] && (( $txt_year_eingabe > $int_aktuelles_jahr )) && [[ "$txt_year_eingabe" != "" ]] )
+    do
+    #echo -e ":::::::: DEBUG: txt_year_eingabe: $txt_year_eingabe"
+    txt_year_eingabe=$(kdialog --title='Jahr des Albums?' --inputbox '== lx-album-split: ==================<br><br>Bitte das Erscheinungsjahr (YYYY) des Albums<br>angeben! Falls Sie das Jahr nicht wissen, klicken Sie<br>einfach auf Abbrechen.<br><br>' "$str_vorgabe" 320 180)
+    if [ "$?" = 1 ]
+        then
+        txt_year_eingabe=""
+        break;
+    fi
+done
+
+# --- DEBUG ---
+#exit 0;
+
+
+
+# echo -e "---"
+# echo -e "*** Sonderzeichen entfernen: ***"
+# for i in *$extension
+#  do
+#  #echo -e "RENAME $i" | sed "s/ /_/g"
+#  echo -e "---RENAME $i"
+#  #rename 's/[^abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-_ ]//g' "$i"
+#  rename 's/[^abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_ \-\.]//g' "$i"
+#  echo -e "...done"
+# done
+
+#mkdir split; X=0; while( [ $X -lt 5 ] ); do echo $X; ffmpeg -i big_audio_file.mp3 -acodec copy -t 00:30:00 -ss 0$X:00:00 split/${X}a.mp3; ffmpeg -i big_audio_file.mp3 -acodec copy -t 00:30:00 -ss 0$X:30:00 split/${X}b.mp3;  X=$((X+1)); done;
+
+echo -e "***"
+echo -e "*** Album splitten: ***"
+for i in *$extension
+ do
+ #echo -e "RENAME $i" | sed "s/ /_/g"
+ echo -e "*** Datei zum Aufteilen: $i"
+ echo -e "***"
+ cp $i "$i.bak"
+ outfile_1=${i%$extension}
+ verzeichnis=${outfile_1:0:10}
+ verzeichnis=$verzeichnis`printf _%03d`
+ #outfile=$outfile`printf _%03d$extension`
+ #dauer=do ffprobe -i $i -show_entries format=duration -v quiet -of csv="p=0"
+ dauer=$(ffprobe -v quiet $i -show_format 2>&1 | sed -n 's/duration=//p')
+ dauer=${dauer%.*}
+ #echo -e "---"
+ #echo -e "*** Verzeichnis: $verzeichnis - Länge in Sek.: $dauer"
+
+  typeset -i a=0
+  # datei entsprechend der zeiten splitten:
+  while ( [ $nr -gt $a ] )
+   do
+   #echo -e "dateilaenge: $variable"
+   z_index=$a
+   a=a+1
+   #ffmpeg -i $i -acodec copy -t 00:$variable -ss 00:00:00 $outfile_1`printf _%03d$extension $a`
+   echo -e "***"
+   echo -e "*** Zeit: `date` ...FFMPEG wird gestartet!..."
+   echo -e "*** Datei: `printf %02d_${txt_titel[$z_index]}$extension $a`"
+   echo -e "*** Länge: ${txt_laenge[$z_index]}"
+   echo -e "*** ffmpeg -i $i -acodec copy -ss 00:00:00 -t 00:${txt_laenge[$z_index]} -metadata track=$a -metadata title=\"${txt_titel_original[$z_index]}\" -metadata artist=\"$txt_artist\" -metadata album=\"$txt_album\" -metadata year=\"$txt_year_eingabe\" `printf %02d_${txt_titel[$z_index]}$extension $a`"
+   #exit 0;
+   ffmpeg -v quiet -i $i -acodec copy -ss 00:00:00 -t 00:${txt_laenge[$z_index]} -metadata track=$a -metadata title="${txt_titel_original[$z_index]}" -metadata artist="$txt_artist" -metadata album="$txt_album" -metadata year="$txt_year_eingabe" `printf %02d_${txt_titel[$z_index]}$extension $a`
+   ffmpeg -v quiet -i $i -acodec copy -ss 00:${txt_laenge[$z_index]} "tmp_$i"
+   rm $i
+   cp "tmp_$i" $i
+   rm "tmp_$i"
+   echo -e "*** Zeit: `date` ...FFMPEG wurde beendet!..."
+   echo -e "***"
+   #exit 0;
+  done
+
+  echo -e "***"
+  echo -e "***************************************************************"
+  echo -e "*** Das Album \"$txt_album\""
+  echo -e "*** von \"$txt_artist\""
+  echo -e "*** wurde erfolgreich aufgeteilt!"
+  echo -e "***************************************************************"
+
+  kdialog --title="INFO" --msgbox="== lx-album-split: ==================<br><br>$a Dateien erfolgreich erstellt!<br><br>Künstler: <i>\"$txt_artist\"</i><br>Album: <i>\"$txt_album\"</i><br><br>Die ID3 Daten (Track, Titel, Künstler,...)<br>wurden automatisch hinterlegt.<br><br>Eine Sicherheitskopie der Originaldatei wurde<br>unter folgendem Namen gespeichert:<br><br><i>$i.bak</i><br>"
+
+#    #echo -e "laenge der dateir als mindestdauer"
+#    #mkdir $verzeichnis
+#    startzeit="0";
+#    a=0
+#     #while( [ $dauer -gt 0 ] ); do
+#     while( [ $dauer -lt 0 ] ); do
+#      #outfile=$outfile_1`printf _%03d$extension` $a
+#      a=$[a+1]
+#      #ffmpeg -i $i -acodec copy -t 00:05:00 -ss 00:$startzeit:00 $outfile_1`printf _%03d$extension $a`
+#      startzeit=$[startzeit+($splitlaenge/60)]
+#      dauer=$[dauer-$splitlaenge]
+#      echo -e "---$startzeit"
+#      echo -e "---$dauer"
+#      echo -e "------"
+#     done
+#   #fi
+  
+
+ #ffmpeg -i $i -acodec copy -f segment -segment_time 300 $outfile
+ #ffmpeg -i $i -acodec copy -t 00:30:00 -ss 00:00:00 $outfile
+ echo -e "...done"
+done
+
+
+
+
+
+
+exit 0;
+
+
+
+

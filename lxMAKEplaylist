@@ -158,10 +158,15 @@ fi
 # -------------------------------------------------------------------------------------------------
 # ----- START Standard Parameter definieren: ------------------------------------------------------
 # -------------------------------------------------------------------------------------------------
+strPfadStartVerzeichnis="$pfad"
+
 extension=".mp*"
 extension2=".avi"
+
 name_datei_playliste="00_alle_pls.m3u"
 name_datei_update="00_alle_pls_update.sh"
+dateiPlaylistRekursiv="00-Pls-rekursiv.m3u"
+
 #echo -e "$extension"
 suchpfad_speichern_pls=*$extension
 suchpfad=$pfad*$extension
@@ -204,7 +209,25 @@ fncMakeArrSuchpfad
 
 
 
+function fncErstellenUpdateSkript {
+    # -Mittels $1 wird der Speicherort für das Updateskript angegeben!
 
+    [[ -z "$1" ]] && echo -e "|- ${FUNCNAME[0]} FEHLER:"\\t"1. Argument nicht angegeben!" && return 11
+    #[[ -z "$2" ]] && echo -e "|- ${FUNCNAME[0]} FEHLER:"\\t"2. Argument nicht angegeben!" && return 12
+    strSpeicherort="$1"
+    [[ "$strSpeicherort" != */ ]] && strSpeicherort="$strSpeicherort/"
+
+    # -Updateskript erstellen:
+    touch $strSpeicherort$name_datei_update
+    echo -e "#!/bin/bash" > $strSpeicherort$name_datei_update
+    echo -e "# --- ein update script fuer die playliste LEVEL0 ---" >> $strSpeicherort$name_datei_update
+    #echo -e "" >> $pfad$name_datei_update
+    echo -e "# aktueller ort wird als pfad angenommen:" >> $strSpeicherort$name_datei_update
+    echo -e "pfad=\`pwd\`" >> $strSpeicherort$name_datei_update
+    echo -e "pfad=\$pfad/" >> $strSpeicherort$name_datei_update
+    echo -e "$0 \$pfad true" >> $strSpeicherort$name_datei_update
+    chmod a+x $strSpeicherort$name_datei_update
+}
 
 
 
@@ -267,16 +290,17 @@ then
         echo -e "***"
     fi
 
-  # ein update script fuer diesen pfad erstellen:
-  touch $pfad$name_datei_update
-  echo -e "#!/bin/bash" > $pfad$name_datei_update
-  echo -e "# --- ein update script fuer die playliste LEVEL0 ---" >> $pfad$name_datei_update
-  #echo -e "" >> $pfad$name_datei_update
-  echo -e "# aktueller ort wird als pfad angenommen:" >> $pfad$name_datei_update
-  echo -e "pfad=\`pwd\`" >> $pfad$name_datei_update
-  echo -e "pfad=\$pfad/" >> $pfad$name_datei_update
-  echo -e "$0 \$pfad true" >> $pfad$name_datei_update
-  chmod a+x $pfad$name_datei_update
+#   # ein update script fuer diesen pfad erstellen:
+#   touch $pfad$name_datei_update
+#   echo -e "#!/bin/bash" > $pfad$name_datei_update
+#   echo -e "# --- ein update script fuer die playliste LEVEL0 ---" >> $pfad$name_datei_update
+#   #echo -e "" >> $pfad$name_datei_update
+#   echo -e "# aktueller ort wird als pfad angenommen:" >> $pfad$name_datei_update
+#   echo -e "pfad=\`pwd\`" >> $pfad$name_datei_update
+#   echo -e "pfad=\$pfad/" >> $pfad$name_datei_update
+#   echo -e "$0 \$pfad true" >> $pfad$name_datei_update
+#   chmod a+x $pfad$name_datei_update
+    fncErstellenUpdateSkript "$pfad"
 
 fi
 
@@ -436,9 +460,9 @@ typeset -i zPLAYLISTENintern=0
 
 
 
-# -------------------------------------------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------------------------
 # ----- START Funktion fncMAKEplaylist --------------------------------------------------------------------------------
-# -------------------------------------------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------------------------
 function fncMAKEplaylist {
     pfad="$1"
     [[ "$pfad" != */ ]] && pfad="$pfad""/"
@@ -655,9 +679,9 @@ fi
 # ende der ia schleife
 done
 
-# -------------------------------------------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------------------------
 # ----- ENDE Funktion fncMAKEplaylist ---------------------------------------------------------------------------------
-# -------------------------------------------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------------------------
 }
 
 
@@ -761,6 +785,136 @@ done
 
 
 
+function fncDateienAuslesenAusgabe {
+    # -Erwartet den Speicherort der Playliste in $1 und mehrere PLS Dateien mittels $2, diese werden nacheinander
+    #  ausgelesen.
+    # -Die Ausgabe Aktion kann mittels $3 festgelegt werden, oder innerhalb der Funktion.
+    #
+    # -Auswerten und Ausgeben:
+    # --1. Möglichkeit: Mittels cat Befehl. Dabei wird der Inhalt aller Dateien einfach komplett ausgegeben!
+    # --strDateienAuslesenAusgabeAktion="cat"
+    #
+    # --2. Möglichkeit: Mittels read Befehl. Dabei wird der Inhalt zeilenweise eingelesen, ausgewertet und damit
+    #   eine neue Playliste erstellt.
+    # --strDateienAuslesenAusgabeAktion="read"
+    #
+
+    [[ -z "$1" ]] && echo -e "|- ${FUNCNAME[0]} FEHLER:"\\t"1. Argument nicht angegeben!" && return 11
+    [[ -z "$2" ]] && echo -e "|- ${FUNCNAME[0]} FEHLER:"\\t"2. Argument nicht angegeben!" && return 12
+    #[[ -z "$2" ]] && echo -e "|- FEHLER:"\\t"2. Argument nicht angegeben!" && return 12
+
+    strErstellungsortPlaylistRekursiv="$1"
+    strPfadDateiPlaylistRekursiv="$strErstellungsortPlaylistRekursiv""/""$dateiPlaylistRekursiv"
+    arrDateien=($2)
+
+    strDateienAuslesenAusgabeAktion="read"
+    [[ -n "$3" ]] && strDateienAuslesenAusgabeAktion="$3"
+
+    case "$strDateienAuslesenAusgabeAktion" in
+        ("cat")
+            strFavoritenDateienAusgabe=""
+            for i in "${arrDateien[@]}"
+            do
+                strFavoritenDateienInhaltTmp=""
+                # -Inhalt auslesen und temporär speichern:
+                [[ -n `cat $i` ]] && strFavoritenDateienInhaltTmp="`cat $i`"
+                [[ -z `cat $i` ]] && continue
+                # -Da bei manchen Favoritendateien am Ende noch ein Leerzeichen steht, wird
+                #  dieses hier entfernt:
+                [[ "${strFavoritenDateienInhaltTmp: -1}" == " " ]] && strFavoritenDateienInhaltTmp="${strFavoritenDateienInhaltTmp:0: -1}"
+                [[ -z $strFavoritenDateienAusgabe ]] && strFavoritenDateienAusgabe="$strFavoritenDateienInhaltTmp" && continue
+                [[ -n $strFavoritenDateienAusgabe ]] && strFavoritenDateienAusgabe="$strFavoritenDateienAusgabe $strFavoritenDateienInhaltTmp"
+            done
+            [[ -z $strFavoritenDateienAusgabe ]] && echo -e "Die gewählten Dateien haben keinen Inhalt!" && return
+            # -Doppelte URLs vermeiden:
+            # --Da manche URLs in mehreren Favoritendateien aufgeführt sind und vielleicht auch die alte
+            #   $dateiURLSfav als aktuelle Vorlage gewählt wurde, könnten URLs hier doppelt vorkommen.
+            # --Alle URLs werden deshalb EINZELN mittels des arrFavoritenURLs miteinander verglichen!
+            arrFavoritenURLs=($strFavoritenDateienAusgabe)
+            strFavoritenURLs=""
+            for i in "${arrFavoritenURLs[@]}"
+            do
+                [[ -z "$strFavoritenURLs" ]] && strFavoritenURLs="$i" && continue
+                [[ "$strFavoritenURLs" != *$i* ]] && strFavoritenURLs="$strFavoritenURLs $i"
+            done
+            echo -e "$strFavoritenURLs" > $dateiPlaylistRekursiv
+            ;;
+        ("read")
+            txtDateienAusgabeZeilenweise=""
+            txtDateienAusgabeKopf=""
+            txtDateienAusgabeInhalt=""
+            typeset -i intDateienAusgabeInhaltAnzahlZeilen=0
+
+            # -Schleife für die Dateien:
+            for iDatei in "${arrDateien[@]}"
+            do
+                # -Schleife für das zeilenweise Auswerten:
+                while read txtDateienAusgabeZeilenweise
+                do
+                    [[ "$txtDateienAusgabeZeilenweise" == "#EXTM3U" ]] && [[ "$txtDateienAusgabeKopf" == "" ]] && txtDateienAusgabeKopf="$txtDateienAusgabeZeilenweise" && echo -e "$txtDateienAusgabeKopf" > $strPfadDateiPlaylistRekursiv && continue
+                    [[ "$txtDateienAusgabeZeilenweise" == "#EXTINF"* ]] && txtDateienAusgabeInhalt=${txtDateienAusgabeZeilenweise//*,/} && echo -e "#EXTINF:$intDateienAusgabeInhaltAnzahlZeilen,$txtDateienAusgabeInhalt\\n$txtDateienAusgabeInhalt" >> $strPfadDateiPlaylistRekursiv && intDateienAusgabeInhaltAnzahlZeilen=intDateienAusgabeInhaltAnzahlZeilen+1
+                done < $iDatei
+            done
+            ;;
+    esac
+    [[ "$intDateienAusgabeInhaltAnzahlZeilen" -gt 0 ]] && return 0;
+}
+
+function fncMakePlaylistRekursiv {
+    # -Mittels $1 kann der Erstellungsort für die rekursive Playliste angegeben werden. Ansonsten
+    #  wird strPfadStartVerzeichnis genutzt.
+
+    strErstellungsortPlaylistRekursiv="$strPfadStartVerzeichnis"
+    [[ -n "$1" ]] && strErstellungsortPlaylistRekursiv="$1"
+
+    arrPlaylistRekursiv=(`find "$strErstellungsortPlaylistRekursiv" -type f -name "$name_datei_playliste"`)
+    strPlaylistRekursivDateipfade=""
+    [[ "${#arrPlaylistRekursiv[@]}" -lt 2 ]] && return 10;
+
+    for iPls in "${arrPlaylistRekursiv[@]}"
+    do
+        strPlaylistRekursivDateipfade="$strPlaylistRekursivDateipfade""$iPls "
+    done
+    #kdialog --title="INFO-PLS" --msgbox="<b>Verzeichnis:</b><br>$strErstellungsortPlaylistRekursiv<hr><b>Playlisten:</b><br>$strPlaylistRekursivDateipfade"
+    #echo -e `fncDateienAuslesenAusgabe "$strPlaylistRekursivDateipfade"` > $dateiPlaylistRekursiv
+    `fncDateienAuslesenAusgabe "$strErstellungsortPlaylistRekursiv" "$strPlaylistRekursivDateipfade"`
+    statusFncAktuell=$?
+    return $statusFncAktuell;
+}
+
+
+
+# -Bedingungen für rekursive Playliste:
+# --unter dem Erstellungsort gibt es mindestens eine Verzeichnisebene
+# --mindestens 2 Verzeichnisse auf der untersten Ebene
+#
+# --Beispiel: Keine rekursive Playliste erstellen, da nur 1 UVZ vorhanden!
+# /musik/The_King
+# /musik/The_King/Gravelands
+#
+# --Beispiel: Die rekursive Playliste erstellen, da (mindestens) 2 UVZ vorhanden sind.
+# /musik/Queen
+# /musik/Queen/Hard-Work
+# /musik/Queen/Jazz
+# /musik/Queen/rekursivePLS.m3u (Inhalt sind die Dateien aus Hard-Work und Jazz)
+
+arrUVZDepthMin1Max1=(`find "$strPfadStartVerzeichnis" -mindepth 1 -maxdepth 1 -type d`)
+for iUVZDepthMin1Max1 in "${arrUVZDepthMin1Max1[@]}"
+do
+    #kdialog --title "DEBUG Popup" --passivepopup "`fncHHMMSS`<br><br>$iUVZDepthMin1Max1" 10 --geometry=400x160 &
+    arrUVZDepthMax=(`find "$iUVZDepthMin1Max1" -mindepth 1 -maxdepth 1 -type d`)
+    #`fncMakePlaylistRekursiv "$iUVZDepthMin1Max1"`
+    #[[ "${#arrUVZDepthMax[@]}" -gt 1 ]] && `fncMakePlaylistRekursiv "$iUVZDepthMin1Max1"` && kdialog --title "DEBUG Popup" --passivepopup "`fncHHMMSS`<br><br>$iUVZDepthMin1Max1" 10 --geometry=400x160 &
+    [[ "${#arrUVZDepthMax[@]}" -gt 1 ]] && `fncErstellenUpdateSkript "$iUVZDepthMin1Max1"` && `fncMakePlaylistRekursiv "$iUVZDepthMin1Max1"`
+    statusFncMakePlaylistRekursiv=$?
+done
+
+
+#fncMakePlaylistRekursiv
+#statusFncMakePlaylistRekursiv=$?
+
+
+
 
 
 
@@ -773,7 +927,7 @@ txtbox_stats="\n\nAnzahl Playlisten: $zPLAYLISTENgesamt\n\n$zeit_start..INFO..Au
 if ( [[ "$flag_update" == "true" ]] && [[ "$flag_aufruf_intern" != "true" ]] )
  then
  #echo -e "-MSGBOX: update"
- kdialog --title="INFO" --msgbox="Update erfolgreich!$txtbox_pfad$txtbox_stats\n\n\n-ende:update-"
+ kdialog --title="INFO.$statusFncMakePlaylistRekursiv" --msgbox="Update erfolgreich!$txtbox_pfad$txtbox_stats\n\n\n-ende:update-"
  echo -e "|- ENDE: update - $zPLAYLISTENgesamt"
  echo -e "|- Aufgerufen: $zeit_start"
  echo -e "|- Gestartet : $zeit_ACTIONstart"

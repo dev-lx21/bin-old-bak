@@ -1,35 +1,106 @@
 #!/bin/bash
 # script von -lx-
 
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+# ----- ToDo:
+#
+# ----- DONE:
+#
+# ----- Bugs:
+#
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+# [[ -z "$1" ]] && echo -e "|- ${FUNCNAME[0]} FEHLER:"\\t"1. Argument nicht angegeben!" && return 11
+# [[ -z "$2" ]] && echo -e "|- ${FUNCNAME[0]} FEHLER:"\\t"2. Argument nicht angegeben!" && return 12
+# -------------------------------------------------------------------------------------------------
+# ----- START -------------------------------------------------------------------------------------
+# ----- ENDE --------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 
 
 
-
+# -------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 
 function fncDEBUGstart {
     flagFNCdebug="true"
-    #exec >`tty` 2>&1
     [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
-    #echo -e "--------------------------------------------------------------------------------" && echo -e "---------- START Debug: $txtDEBUGtitel" && echo -e "--------------------------------------------------------------------------------"
     echo -e "--------------------------------------------------------------------------------"
-    #echo -e "---------- START Debug: $txtDEBUGtitel"
     echo -e "--- [`fncHHMMSS 'norm.mS3'`] - START Debug: $txtDEBUGtitel"
-    #export PS4='+ ${LINENO}:'`echo -en '\\t'`
     PS4='+ ${LINENO}:'`echo -en '\\t'`
     set -x
 }
 
 function fncDEBUGstop {
-    #[ ! "$flagFNCdebug" ] && echo -e "--- FEHLER: fncDEBUGstop ohne vorher fncDEBUGstart aufzurufen!" && return
+    # -Damit fncDEBUGstop nur ausgeführt wird, wenn vorher fncDEBUGstart aufgerufen wurde.
     [ ! "$flagFNCdebug" ] && return
     set +x
     [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
-    #echo -e "--------------------------------------------------------------------------------" && echo -e "---------- ENDE Debug: $txtDEBUGtitel" && echo -e "--------------------------------------------------------------------------------"
-    #echo -e "---------- ENDE Debug: $txtDEBUGtitel"
     echo -e "--- [`fncHHMMSS 'norm.mS3'`] - ENDE Debug: $txtDEBUGtitel"
     echo -e "--------------------------------------------------------------------------------"
-    #exec >/dev/null 2>&1
 }
+
+
+function fncClearX {
+    # -Da 'clear -x' einen Bug hat und deshalb den sichtbaren Teil der letzten
+    #  Befehle einfach löscht, werden soviele leere Zeilen ausgegeben, wie der
+    #  Bildschirm Zeilen hat.
+    # -Beim Aufruf von 'clear -x' löscht der Befehl dann diese leeren Zeilen
+    #  und die History wird nicht überschrieben.
+    typeset -i intAnzahlScreenZeilen=$(tput lines)
+    for ((iZeilen=1; iZeilen<$intAnzahlScreenZeilen; iZeilen++))
+    do
+        echo -e "$iZeilen"
+    done
+    clear -x
+}
+
+
+dateiVersionInfoNr=""
+function fncAUSLESENversion {
+    [ -z $datei ] && datei=${0//*\//}
+    [ -z $nutzer ] && nutzer=`ps --pid $$ -o user=` && [[ "$nutzer" == "root" ]] && nutzer=`id -un 1000`
+    strVERZEICHNISbin="/home/$nutzer/bin-bak/"
+    iaLSarray=(`ls -r $strVERZEICHNISbin$datei"_"* 2>/dev/null`)
+    iaLSarrayANZAHL=${#iaLSarray[@]}
+    dateiNameKomplett=${iaLSarray[0]}
+    dateiVersionKomplett=${iaLSarray[0]}
+
+    #  foo/bar/lxDOWNLOAD_2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+
+    # -Bis zum letzten Slash abschneiden:
+    dateiVersionKomplett=${dateiVersionKomplett//*\//}
+    #  lxDOWNLOAD_2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+
+    # -Dateiname bis Unterstrich abschneiden:
+    dateiVersionKomplett=${dateiVersionKomplett//`echo -e $datei`_/}
+    #  2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+
+    # -Unterstrich bis zum Ende abschneiden: dateiVersionInfoNr
+    dateiVersionInfoNr=${dateiVersionKomplett//_*/}
+    #  2.17.05-01-01
+
+    # -Bis zum Unterstrich abschneiden: dateiVersionKomplettTxt
+    dateiVersionKomplettTxt=${dateiVersionKomplett//$dateiVersionInfoNr\_/}
+    #  TODO_einbauen-dateiVersionNrTxt
+
+    # -Nur die Kategorie ausschneiden:
+    dateiVersionInfoKategorie=${dateiVersionKomplettTxt//_*/}
+    #  TODO
+
+    # -Nur den Infotext ausschneiden:
+    dateiVersionInfoTxt=${dateiVersionKomplettTxt//$dateiVersionInfoKategorie\_/}
+    #  einbauen-dateiVersionNrTxt
+
+    dateiVersionInfoNr="$dateiVersionInfoNr"
+    dateiVersionInfoKategorie="$dateiVersionInfoKategorie"
+    dateiVersionInfoTxt="$dateiVersionInfoTxt"
+
+}
+[[ ! $dateiVersionInfoNr ]] && fncAUSLESENversion
+[[ -z "$datei" ]] && echo -e "[FEHLER: Variable konnte nicht gelesen werden: 'datei']" && exit 22;
+
 
 
 function fncHHMMSS {
@@ -43,23 +114,20 @@ function fncHHMMSS {
         ( nurSS.mS3 )
             HMSmS=`date '+%S.%N'`
             HMSxyz=${HMSmS//.*/}
-            mSxyz=${HMSmS//*:/}
-            mSxyz=`echo $mSxyz | awk '{printf "%.3f", $mSxyz}'`
-            mSxyz=${mSxyz//*./}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:3}
             echo -en $HMSxyz"."$mSxyz ;;
         ( norm.mS2 )
             HMSmS=`date '+%H:%M:%S.%N'`
             HMSxyz=${HMSmS//.*/}
-            mSxyz=${HMSmS//*:/}
-            mSxyz=`echo $mSxyz | awk '{printf "%.2f", $mSxyz}'`
-            mSxyz=${mSxyz//*./}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:2}
             echo -en $HMSxyz"."$mSxyz ;;
         ( norm.mS3 )
             HMSmS=`date '+%H:%M:%S.%N'`
             HMSxyz=${HMSmS//.*/}
-            mSxyz=${HMSmS//*:/}
-            mSxyz=`echo $mSxyz | awk '{printf "%.3f", $mSxyz}'`
-            mSxyz=${mSxyz//*./}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:3}
             echo -en $HMSxyz"."$mSxyz ;;
         (*)
             echo -en `date '+%H:%M:%S'` ;;
@@ -67,7 +135,28 @@ function fncHHMMSS {
     #echo -en `date '+%H:%M:%S'`
 }
 
-
+function fncYEAR1231 {
+    case "$1" in
+        ( nurZAHLEN )
+            echo -en `date '+%Y%m%d'`
+            ;;
+        ( YEAR )
+            echo -en `date '+%Y'`
+            ;;
+        ( 12 )
+            echo -en `date '+%m'`
+            ;;
+        ( 31 )
+            echo -en `date '+%d'`
+            ;;
+        ( 1231 )
+            echo -en `date '+%m%d'`
+            ;;
+        (*)
+            echo -en `date '+%Y-%m-%d'`
+            ;;
+    esac
+}
 
 
 
@@ -111,6 +200,7 @@ fi
 
 pfad=`pwd`
 pfad="$pfad/"
+strPfadAlle=""
 zeitSTART=`date`
 flagACTION="false"
 flagKEINpfad="false"
@@ -126,19 +216,27 @@ txtZeileStart="|- "
 
 # -------------------------------------------------------------------
 # ----- START Optionen Kontrolle ------------------------------------
-# -Falls einer der eingegebenen Stringparameter nicht mit "-" anfängt
-#  wird dieser als Pfad gesetzt!
+# -Falls einer der eingegebenen Stringparameter mit "/" anfängt
+#  wird dieser als Pfad gesetzt! Mehrere Pfad Angaben in Variable
+#  speichern: strPfadAlle
+#
 for i in "$@"
 do
     # -Stringparameter einzeln prüfen:
     if ( [[ "$i" != "" ]] )
     then
-        if ( [[ "$i" != -* ]] )
+        #if ( [[ "$i" != -* ]] )
+        if ( [[ "$i" == /* ]] )
             then
-            #echo -e "--- String fängt nicht mit "-" an! ---"
-            #echo -e "--- String ist keine Option, also Pfad! ---"
+            #echo -e "--- String fängt mit "/" an! ---"
+            #echo -e "--- String ist eine Pfad Angabe! ---"
             pfad="$i"
             flagKEINpfad="false"
+
+            # -Falls Pfad ein Device ist, muss der Slash am Ende wieder entfernt werden:
+            [[ "$pfad" == /dev/* ]] && [[ "$pfad" == */ ]] && pfad="${pfad:0: -1}"
+
+            [[ "$strPfadAlle" == "" ]] && strPfadAlle="$pfad" || strPfadAlle="$strPfadAlle $pfad"
         else
             flagKEINpfad="true"
         fi
@@ -184,6 +282,16 @@ fi
 
 # -Falls Pfad ein Device ist, muss der Slash am Ende wieder entfernt werden:
 [[ "$pfad" == /dev/* ]] && [[ "$pfad" == */ ]] && pfad="${pfad:0: -1}"
+
+
+# -------------------------------------------------------------------
+# -------------------------------------------------------------------
+# -Mehrere Pfad Angaben verwenden:
+[[ "$strPfadAlle" != "" ]] && pfad="$strPfadAlle"
+# -------------------------------------------------------------------
+# -------------------------------------------------------------------
+
+
 
 
 
@@ -456,6 +564,7 @@ txtKOPFlogs=$txtKOPF"Logdatei"\\n\
 "|-"
 
 txtKOPF=$txtKOPF$txtTITEL\\n\
+"|- $dateiVersionInfoNr ($dateiVersionInfoKategorie: $dateiVersionInfoTxt)"\\n\
 "|--------------------------------------------------------------------------------"\\n\
 "|- $zeitSTART"\\n\
 "|-"
@@ -579,11 +688,13 @@ fi
 if ( [[ "$strSORT" != "" ]] )
 then
     #echo -e "|-"
+    #echo -e "|- Pfad(e):\\t$strPfadAlle"
     echo -e "|- Befehl:\\t$strBEFEHL01"
     echo -e "|- Sortierung:\\t$strBEFEHL02"
     `echo -e "$strBEFEHL01"` 2>/dev/null | `echo -e "$strBEFEHL02"`
 else
     #echo -e "|-"
+    #echo -e "|- Pfad(e):\\t$strPfadAlle"
     echo -e "|- Befehl:\\t$strBEFEHL"
     #echo -e "|- Sortierung: $strBEFEHL02"
     `echo -e "$strBEFEHL"` 2>/dev/null

@@ -12,14 +12,17 @@
 #
 # ---------------------------------------------------------------------------------------
 # ---------------------------------------------------------------------------------------
-# [[ -z "$1" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return
+# [[ -z "$1" ]] && echo -e "|- ${FUNCNAME[0]} FEHLER:"\\t"1. Argument nicht angegeben!" && return 11
+# [[ -z "$2" ]] && echo -e "|- ${FUNCNAME[0]} FEHLER:"\\t"2. Argument nicht angegeben!" && return 12
+# -------------------------------------------------------------------------------------------------
+# ----- START -------------------------------------------------------------------------------------
+# ----- ENDE --------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 
 
 
 
 flagCRONJOB="false"
-
-
 # -Cronjob bzw Display testen:
 if [[ `tty` == *dev* ]]
 then
@@ -63,9 +66,93 @@ else
 fi
 
 
-datei=${0//*\//}
+
+
+
+# -------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+function fncDEBUGstart {
+    flagFNCdebug="true"
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    echo -e "--------------------------------------------------------------------------------"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - START Debug: $txtDEBUGtitel"
+    PS4='+ ${LINENO}:'`echo -en '\\t'`
+    set -x
+}
+
+function fncDEBUGstop {
+    # -Damit fncDEBUGstop nur ausgeführt wird, wenn vorher fncDEBUGstart aufgerufen wurde.
+    [ ! "$flagFNCdebug" ] && return
+    set +x
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - ENDE Debug: $txtDEBUGtitel"
+    echo -e "--------------------------------------------------------------------------------"
+}
+
+
+function fncClearX {
+    # -Da 'clear -x' einen Bug hat und deshalb den sichtbaren Teil der letzten
+    #  Befehle einfach löscht, werden soviele leere Zeilen ausgegeben, wie der
+    #  Bildschirm Zeilen hat.
+    # -Beim Aufruf von 'clear -x' löscht der Befehl dann diese leeren Zeilen
+    #  und die History wird nicht überschrieben.
+    typeset -i intAnzahlScreenZeilen=$(tput lines)
+    for ((iZeilen=1; iZeilen<$intAnzahlScreenZeilen; iZeilen++))
+    do
+        echo -e "$iZeilen"
+    done
+    clear -x
+}
+
+
+dateiVersionInfoNr=""
+function fncAUSLESENversion {
+    [ -z $datei ] && datei=${0//*\//}
+    [ -z $nutzer ] && nutzer=`ps --pid $$ -o user=` && [[ "$nutzer" == "root" ]] && nutzer=`id -un 1000`
+    strVERZEICHNISbin="/home/$nutzer/bin-bak/"
+    iaLSarray=(`ls -r $strVERZEICHNISbin$datei"_"* 2>/dev/null`)
+    iaLSarrayANZAHL=${#iaLSarray[@]}
+    dateiNameKomplett=${iaLSarray[0]}
+    dateiVersionKomplett=${iaLSarray[0]}
+
+    #  foo/bar/lxDOWNLOAD_2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+
+    # -Bis zum letzten Slash abschneiden:
+    dateiVersionKomplett=${dateiVersionKomplett//*\//}
+    #  lxDOWNLOAD_2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+
+    # -Dateiname bis Unterstrich abschneiden:
+    dateiVersionKomplett=${dateiVersionKomplett//`echo -e $datei`_/}
+    #  2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+
+    # -Unterstrich bis zum Ende abschneiden: dateiVersionInfoNr
+    dateiVersionInfoNr=${dateiVersionKomplett//_*/}
+    #  2.17.05-01-01
+
+    # -Bis zum Unterstrich abschneiden: dateiVersionKomplettTxt
+    dateiVersionKomplettTxt=${dateiVersionKomplett//$dateiVersionInfoNr\_/}
+    #  TODO_einbauen-dateiVersionNrTxt
+
+    # -Nur die Kategorie ausschneiden:
+    dateiVersionInfoKategorie=${dateiVersionKomplettTxt//_*/}
+    #  TODO
+
+    # -Nur den Infotext ausschneiden:
+    dateiVersionInfoTxt=${dateiVersionKomplettTxt//$dateiVersionInfoKategorie\_/}
+    #  einbauen-dateiVersionNrTxt
+
+    dateiVersionInfoNr="$dateiVersionInfoNr"
+    dateiVersionInfoKategorie="$dateiVersionInfoKategorie"
+    dateiVersionInfoTxt="$dateiVersionInfoTxt"
+
+}
+[[ ! $dateiVersionInfoNr ]] && fncAUSLESENversion
+[[ -z "$datei" ]] && echo -e "[FEHLER: Variable konnte nicht gelesen werden: 'datei']" && exit 22;
+
+
+
 txtTITEL="Systemtool für Prozesse, Dienste und Konfiguration!"
-nutzer=`ps --pid $$ -o user=`
 
 
 function fncHHMMSS {
@@ -126,7 +213,7 @@ function fncSTATUSlxps {
     # -Prozessinfo anzeigen:
     echo -e "|- `fncHHMMSS 'norm.mS3'` --- Prozess: \"$1\" - Info anzeigen:"
     sleep 0.5
-    lxPS -q $1
+    /home/$nutzer/bin/lxPS -q $1
 }
 
 
@@ -257,6 +344,61 @@ function fncBEFEHL2 {
     echo -e "$txtAUSGABEanfang"
     return $stsBEFEHL;
 }
+
+
+
+function fncKillPid {
+    strKILLsignal=""
+    if ( [[ "$2" != "" ]] )
+    then
+        strKILLsignal="$2 "
+    fi
+
+    if ( [[ "$1" != "" ]] )
+    then
+        intKILLpid="$1"
+        typeset -i zKILL=0
+        flagDONEkill="false"
+        while ( [[ `ps -p $intKILLpid -o pid=` != "" ]] )
+        do
+            txtPROZESSname="`ps -p $intKILLpid -o comm=`"
+            if ( [[ "$flagDONEkill" != "true" ]] )
+            then
+                #fncECHOlx "|- "`fncHHMMSS`" INFO $intID: "\ "+- Befehl: Kill SIGTERM $intKILLpid Prozess $txtPROZESSname"
+                exec >/dev/null 2>&1
+                # -Die Ausgabe in /dev/null umleiten wegen Fehlermeldungen nach Kill Befehl:
+                kill $strKILLsignal$intKILLpid >/dev/null 2>&1 &
+                exec >`tty` 2>&1
+            fi
+            #kdialog --title "Status.KILL.`fncHHMMSS 'norm.mS2'`" --passivepopup "--- KILL PID: $intKILLpid<br><br>--- Taste: $eingabeTASTE" 10 --geometry=260x100 &
+            zKILL=zKILL+1
+            sleep 0.05
+            # -Maximale Wartezeit: 10 Sekunden
+            #  10 Sekunden / sleep 0.05 = 200 Durchläufe der while Schleife
+            #  8 Sekunden / sleep 0.05 = 160 Durchläufe der while Schleife
+            [ $zKILL -ge 199 ] && flagDONEkill="true"
+            #[ $zKILL -ge 40 ] && fncECHOlx "|- "`fncHHMMSS`" INFO $intID: "\ "+- Befehl: Kill SIGKILL Prozess $txtPROZESSname"
+            [ $zKILL -ge 200 ] && kill -9 $intKILLpid >/dev/null 2>&1 &
+            [ $zKILL -ge 200 ] && break
+
+        done
+    fi
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 #echo -e "test-systemd..."\\n >> /home/lx21/bin/lxSYS.cache.txt
@@ -404,7 +546,6 @@ function fncSYSTEMDjournalctl {
             
             # -CHECK-START: Wenn der $txtDIENSTparentNAME keinen Fehler hat, aber der $txtDIENSTchildNAME einen Fehler
             #  hat, wird nur der $txtDIENSTchildNAME neu gestartet:
-#             [[ "$flagDIENSTcheckFEHLER" == *$txtDIENSTchildNAME* ]] && echo -e "checkFEHLER ist-child: $flagDIENSTcheckFEHLER"
 #             [ "$flagDIENSTcheckFEHLER" != *$txtDIENSTparentNAME* ] && echo -e "child-name: $txtDIENSTchildNAME ----- checkFEHLER nicht-parent: $flagDIENSTcheckFEHLER"
 #             [ "$flagDIENSTcheckFEHLER" == *"$txtDIENSTchildNAME"* ] && echo -e "checkFEHLER zeichen ist-child: $flagDIENSTcheckFEHLER"
 #             [ "$flagDIENSTcheckFEHLER" == *$txtDIENSTchildNAME* ] && echo -e "checkFEHLER ist-child: $flagDIENSTcheckFEHLER"
@@ -415,7 +556,12 @@ function fncSYSTEMDjournalctl {
                     echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtDIENSTchildNAME.$txtDIENSTparentNAME: Dienst neu starten..." >> $strJOURNALCTLserviceLOGDATEI
                     $2 -aqf -u $3 -S $zeitHMSjetzt >> $strJOURNALCTLserviceLOGDATEI &
                     txtDIENSTchildPID=$!
-                    echo -e "$txtDIENSTchildPID" > $strJOURNALCTLservicePIDDATEI
+
+                    # -Beim Systemstart liegt keine Schreibberechtigung vor, daher doppelte Kontrolle!
+                    # --"Existiert-NICHT" und "Schreibrechte"
+                    [ ! -f $strJOURNALCTLservicePIDDATEI ] && echo -e "$txtDIENSTchildPID" > $strJOURNALCTLservicePIDDATEI
+                    [ -w $strJOURNALCTLservicePIDDATEI ] && echo -e "$txtDIENSTchildPID" > $strJOURNALCTLservicePIDDATEI
+
                     echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtDIENSTchildNAME.$txtDIENSTparentNAME: Dienst erfolgreich neu gestartet! (PID: $txtDIENSTchildPID)" >> $strJOURNALCTLserviceLOGDATEI
                     flagDIENSTcheckFEHLER=""
                     ;;
@@ -633,6 +779,10 @@ function fncSYSTEMD {
     # -$3: Elternprozess der durch systemd überwacht wird
     # -$4: Action: START, CHECK, STOP
     case "$2" in
+        ( "sysctl" )
+            fncSystemDStartRestart $@
+            return $?;
+            ;;
         ( "journalctl" )
             fncSYSTEMDjournalctl $@
             return $?;
@@ -702,32 +852,58 @@ case "$1" in
         echo -e "-------------------------------------------------------------------------------"
         exit $?;
         ;;
-    # --- lxSYS Action: collectiongain ----------------------------------------
-    ( "collectiongain" )
-        echo -e "--- lxSYS collectiongain starten ----------------------------------------------"
+    # --- lxSYS Action: rsgain ----------------------------------------
+    ( "-gain" )
+        echo -e "--- lxSYS rsgain starten ----------------------------------------------"
+        txtInfoAction=""
+        txtInfoActionStatus=""
+
+        strRSgainOptionen=""
+        # -RSgain Optionen:
+        # -L: alle Tags lowercase schreiben
+        # -a: Album Gain auslesen
+        # -s i: Replaygain verwendet v2.0
+        # -c a: Clipping Protection immer eingeschaltet
+        #
+        # -Verzeichnis bzw Dateien einbinden:
+        #  rsgain custom -abcd `find /aa_daten/musik_tmp/aa_download/ac_pls-yt/ -name "*.mp3"`
+        #
+        strRSgainOptionen="custom -L -a -s i -c a"
+        [[ "$2" != "" ]] && strRSgainOptionen="$2"
         
-        strCollGainOptionen=""
-        [[ "$2" != "" ]] && strCollGainOptionen="$2 "
-        
-        arrCollGainVerzeichnisse=(/aa_daten/musik /aa_daten/musik_tmp)
-        for strCollGainVerzMusik in "${arrCollGainVerzeichnisse[@]}"
+        #arrRSgainVerzeichnisse=(/aa_daten/musik_tmp/aa_test/01 /aa_daten/musik_tmp/aa_test/02)
+        arrRSgainVerzeichnisse=(/aa_daten/musik /aa_daten/musik_tmp)
+        for strRSgainVerzMusik in "${arrRSgainVerzeichnisse[@]}"
         do
             echo -e "-------------------------------------------------------------------------------"
-            echo -e "--- Info START: $strCollGainVerzMusik"
-            #strCollGainVerzMusik="/aa_daten/musik"
-            strCollGainLogsDateiName="${strCollGainVerzMusik//\//-}"
-            [[ "$strCollGainLogsDateiName" == -* ]] && strCollGainLogsDateiName="${strCollGainLogsDateiName:1}"
-            strCollGainLogsVerz="/aa_daten/bak/log/collectiongain/"
-            strCollGainLogsDatei="/aa_daten/bak/log/collectiongain/"`fncYEAR1231 "YEAR"`"/""$strCollGainLogsDateiName""_"`fncYEAR1231 "nurZAHLEN"`"-"`fncHHMMSS "nurZAHLEN"`".txt"
-            [[ ! -d "$strCollGainLogsVerz`fncYEAR1231 "YEAR"`" ]] && mkdir -p "$strCollGainLogsVerz`fncYEAR1231 "YEAR"`"
+            echo -e "--- Info START: $strRSgainVerzMusik"
+            #strRSgainVerzMusik="/aa_daten/musik"
+            strRSgainLogsDateiName="${strRSgainVerzMusik//\//-}"
+            [[ "$strRSgainLogsDateiName" == -* ]] && strRSgainLogsDateiName="${strRSgainLogsDateiName:1}"
+            strRSgainLogsVerz="/aa_daten/bak/log/rsgain/"
+            strRSgainLogsDatei="/aa_daten/bak/log/rsgain/"`fncYEAR1231 "YEAR"`"/""$strRSgainLogsDateiName""_"`fncYEAR1231 "nurZAHLEN"`"-"`fncHHMMSS "nurZAHLEN"`".txt"
+            [[ ! -d "$strRSgainLogsVerz`fncYEAR1231 "YEAR"`" ]] && mkdir -p "$strRSgainLogsVerz`fncYEAR1231 "YEAR"`"
             
             #flagTESTDRIVE="true"
-            collectiongain $strCollGainOptionen"$strCollGainVerzMusik" | tee -a "$strCollGainLogsDatei"
-            echo -e "--- Info ENDE: $strCollGainVerzMusik"
+            #rsgain $strRSgainOptionen"$strRSgainVerzMusik" | tee -a "$strRSgainLogsDatei"
+            #`find /aa_daten/musik_tmp/aa_download/ac_pls-yt/ -name "*.mp3"`
+            #find . -name "*.mp3" -exec rsgain easy {} +
+
+            #rsgain $strRSgainOptionen"`find $strRSgainVerzMusik -name "*.mp3"`" | tee -a "$strRSgainLogsDatei"
+            find $strRSgainVerzMusik -name "*.mp3" -exec rsgain $strRSgainOptionen {} + | tee -a "$strRSgainLogsDatei"
+            stsBEFEHL=$?
+            # -Exit-Status auswerten:
+            #[ $stsBEFEHL -eq 0 ] && echo -e "$txtAUSGABEanfang""KEIN FEHLER: '$stsBEFEHL'" || echo -e "$txtAUSGABEanfang""FEHLER: '$stsBEFEHL'"
+            [ $stsBEFEHL -eq 0 ] && txtInfoActionStatus="KEIN FEHLER: '$stsBEFEHL'" || txtInfoActionStatus="FEHLER: '$stsBEFEHL'"
+
+            echo -e "--- Info ENDE: $strRSgainVerzMusik"
             echo -e "-------------------------------------------------------------------------------"
+
+            txtInfoAction="$txtInfoAction"\\n"--- Verzeichnis: $strRSgainVerzMusik"\\n"--- Status: $txtInfoActionStatus"\\n"--- Logdatei: $strRSgainLogsDatei"\\n
+            txtInfoActionStatus=""
         done
         
-        
+        echo -e "$txtInfoAction"
         exit 0;
         
         
@@ -804,7 +980,7 @@ then
     for i in "${arrPROZESSE[@]}"
     do
         echo -e "- Prozess: $i:"
-        ausgabe=`lxPS -q $i`
+        ausgabe=`/home/$nutzer/bin/lxPS -q $i`
         if ( [[ "$ausgabe" != "" ]] )
         then
             echo -e "$ausgabe"
@@ -822,11 +998,11 @@ then
     for i in "${arrPROZESSE[@]}"
     do
         echo -e "- Prozess: $i:"
-        ausgabe=`lxPS -q $i`
+        ausgabe=`/home/$nutzer/bin/lxPS -q $i`
         if ( [[ "$ausgabe" != "" ]] )
         then
             echo -e "$ausgabe"
-            ausgabePIDs=`lxPS -pid $i`
+            ausgabePIDs=`/home/$nutzer/bin/lxPS -pid $i`
             ausgabePIDs=${ausgabePIDs//$$/}
             for ii in $ausgabePIDs
             do
@@ -919,18 +1095,14 @@ dateiLOGStmp="00_$datei.LOGS.txt.tmp"
 txtHR="|--------------------------------------------------------------------------------"
 
 txtKOPF=\
-"|--------------------------------------------------------------------------------"\\n\
-"|- $datei -| "
-
-txtKOPFlogs=$txtKOPF"Logdatei"\\n\
-"|--------------------------------------------------------------------------------"\\n\
+"$txtHR"\\n\
+"|- $datei -| $txtTITEL"\\n\
+"|- $dateiVersionInfoNr ($dateiVersionInfoKategorie: $dateiVersionInfoTxt)"\\n\
+"$txtHR"\\n\
 "|- $zeitSTART"\\n\
 "|-"
 
-txtKOPF=$txtKOPF$txtTITEL\\n\
-"|--------------------------------------------------------------------------------"\\n\
-"|- $zeitSTART"\\n\
-"|-"
+txtKOPFlogs="$txtKOPF"
 
 
 
@@ -956,8 +1128,19 @@ txtHILFE=$txtBENUTZUNG\\n\
 "|- -l\\t\\tDie Logdatei im aktuellen Verzeichnis anzeigen. Andere Optionen werden ignoriert."\\n\
 "|- Manche Optionen können kombiniert werden. Dabei ist '-qf' das gleiche wie '-fq'."\\n\
 "|-"\\n\
+"|- -sysctl Dienstname [Aktion]"\\n\
+"|- Einen beliebigen 'systemctl' Befehl ausführen. Optional können die Standard SystemD Aktionen angegeben"\\n\
+"|- werden. Wird keine Aktion angegeben, wird immer Start-Restart ausgeführt. Nur für SystemD Dienste!"\\n\
+"|- Bsp:"\\n\
+"|- '$datei -sysctl minidlna'\\tDer Minidlna Dienst startet bzw restartet."\\n\
+"|- '$datei -sysctl systemd-journald'\\tDer Journal Dienst startet bzw restartet."\\n\
+"|- '$datei -sysctl systemd-journald status'\\tDer Journal Dienst Status wird angezeigt."\\n\
+"|-"\\n\
 "|- Erweiterte Optionen:"\\n\
-"|- '$datei -replace'\\tProzesse mittels 'replace' neu starten: kwin_x11, plasmashell"\\n\
+"|- '$datei -sound'\\tSoundserver mittels SystemD neu starten: pipewire, pipewire-pulse"\\n\
+"|- '$datei -display'\\tFenstermanager mittels 'replace' neu starten: kwin_x11 bzw. _wayland, plasmashell"\\n\
+"|- '$datei -replace'\\tGleicher Befehl wie '-display'"\\n\
+"|- '$datei -gain'\\tLautstärke der Audiodateien mittels 'rsgain' normalisieren."\\n\
 "|- '$datei plasma-cp'\\tPlasma Konfigurationsdateien sichern. Verzeichnis:"\\n\
 "|-\\t\\t\\t$strPlasmaSicherungPfadFertig"\\n\
 "|- '$datei plasma-rm'\\tPlasma Konfigurationsdateien löschen. Zuerst können die"\\n\
@@ -1168,7 +1351,7 @@ do
     then
         strg1=$strg1"c"
     fi
-    if ( [[ "$i" == -*l* ]] && [[ "$i" != -url* ]] && [[ "$i" != -replace ]] )
+    if ( [[ "$i" == -*l* ]] && [[ "$i" != -url* ]] && [[ "$i" != -sound ]] && [[ "$i" != -replace ]] && [[ "$i" != -display ]] && [[ "$i" != -gain ]] && [[ "$i" != -sysctl ]] )
     then
         if ( [[ "$i" == -*l\?* ]] )
         then
@@ -1493,11 +1676,11 @@ fi
 ArrPlasmaDateien=(/home/$nutzer/.config/plasma-org.kde.plasma.desktop-appletsrc /home/$nutzer/.config/plasmashellrc /home/$nutzer/.config/plasmarc)
 
 function fncPlasmaCP {
-    fncPlasmaCPPfad UVZBenutzereingabe
-    
     strPlasmaSicherung02UVZ="`date '+%Y%m%d'`_`date '+%H%M%S'`"
     strPlasmaSicherungPfadFertig="/home/$nutzer/Dokumente/bak/plasma/$strPlasmaSicherung02UVZ"
-    
+
+    fncPlasmaCPPfad UVZBenutzereingabe
+
     #echo -e "|- `fncHHMMSS 'norm.mS3'` --- '$txtAusgabeBefehl'"
     
     echo -e "|- `fncHHMMSS 'norm.mS3'`"
@@ -1645,22 +1828,182 @@ fi
 
 
 
-###############################################################################
+###################################################################################################
+###################################################################################################
+# -Prozess Sonderfall: systemctl
+#
+# -ToDo: Zeitbedarf für das Neustarten ermitteln...
+#
+function fncAusgabeIntPID {
+    intWertIntern=`ps -C $1 -o pid=`
+    [[ -z "$intWertIntern" ]] && intWertIntern=`ps -C $1"d" -o pid=`
+    echo -en "$intWertIntern"
+}
+
+function fncSystemctl {
+    # -$1: '-sysctl'
+    # -$2: Dienst bzw Prozessname
+    # -$3: SystemD bzw Systemctl Aktion (STATUS, START...)
+    [[ -z "$2" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - \$2 - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return
+    txtProzessName="$2"
+
+    txtBefehlSystemctl=""
+    [[ -n "$3" ]] && txtBefehlSystemctl="$3"
+    [[ -z "$3" ]] && txtBefehlSystemctl="start"
+
+    # -Info zum gewählten Befehl anzeigen:
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Systemctl SystemD Befehl: \"$txtProzessName\""
+
+    # -PS Status anzeigen:
+    #fncSTATUSlxps $txtProzessName
+
+    intPIDAlt=`fncAusgabeIntPID $txtProzessName`
+    [[ -n "$intPIDAlt" ]] && [[ "$txtBefehlSystemctl" == "start" ]] && txtBefehlSystemctl="re$txtBefehlSystemctl"
+
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Bitte haben Sie einen Moment Geduld während der Befehl ausgeführt wird!"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Befehl: \"$txtBefehlSystemctl $txtProzessName\""
+    #"$txtProzessName" --replace >/dev/null 2>&1 & disown
+    sleep 0.1
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Befehl wird ausgeführt..."
+    systemctl --user "$txtBefehlSystemctl" "$txtProzessName" >/dev/null 2>&1 &
+    pidKONSOLE=$!
+    #sleep 0.5
+    intPIDAlt=""
+    while ( [[ "$intPIDAlt" == "" ]] && [[ "$txtBefehlSystemctl" != "status" ]] )
+    do
+        #sleep 0.1
+        echo -e "|- `fncHHMMSS 'norm.mS3'` --- Befehl wird ausgeführt..."
+        intPIDAlt=`fncAusgabeIntPID $txtProzessName`
+        sleep 0.1
+        intPIDAlt=`ps --pid $intPIDAlt -o pid=`
+    done
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Befehl wird ausgeführt..."
+    sleep 0.1
+    intPIDNeu=`fncAusgabeIntPID $txtProzessName`
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Neue PID:\\t$intPIDNeu"
+    sleep 0.5
+
+    # -PS Status anzeigen:
+    #fncSTATUSlxps $txtProzessName
+
+    # -Optional: Nur wenn die Aktion nicht 'status' war, wird SystemD Status angezeigt:
+    #[[ "$txtBefehlSystemctl" != "status" ]] && systemctl status $txtProzessName
+    systemctl status $txtProzessName
+
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Befehl beendet: \"$txtBefehlSystemctl $txtProzessName\""
+    #echo -e "|- `fncHHMMSS 'norm.mS3'`"
+    echo -e "|-"
+}
+
+if ( [[ "$*" == *-sysctl* ]] )
+then
+    fncSystemctl $@
+    #echo -e "|-"
+
+    exit 0;
+fi
+###################################################################################################
+###################################################################################################
+
+
+
+
+
+
+###################################################################################################
+###################################################################################################
+# -Prozess Sonderfall: systemd restart
+#
+# -ToDo: Zeitbedarf für das Neustarten ermitteln...
+#
+function fncSystemDStartRestart {
+    txtProzessName="$1"
+
+    # -Info zum gewählten Befehl anzeigen:
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- SystemD Restart: \"$txtProzessName\""
+
+    # -PS Status anzeigen:
+    fncSTATUSlxps $txtProzessName
+
+    arrPIDAlt=`ps -C $txtProzessName -o pid=`
+
+    # -Falls mehrere Prozesse mit dem Namen $txtProzessName laufen, werden bis auf
+    #  einen alle anderen beendet. Ansonsten funktioniert der Restart nicht korrekt.
+    arrPIDAlt=($arrPIDAlt)
+    intPIDAlt=""
+    for iPIDAlt in "${arrPIDAlt[@]}"
+    do
+        [[ -z "$intPIDAlt" ]] && intPIDAlt="$iPIDAlt" && continue
+        fncKillPid $iPIDAlt
+    done
+
+
+
+    txtBefehlSystemctl="start"
+    [[ -n "$intPIDAlt" ]] && txtBefehlSystemctl="re$txtBefehlSystemctl"
+
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Bitte haben Sie einen Moment Geduld während der Befehl ausgeführt wird!"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Befehl: \"$txtBefehlSystemctl $txtProzessName\""
+    #"$txtProzessName" --replace >/dev/null 2>&1 & disown
+    sleep 0.1
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Befehl wird ausgeführt..."
+    systemctl --user "$txtBefehlSystemctl" "$txtProzessName" >/dev/null 2>&1 &
+    pidKONSOLE=$!
+    sleep 0.5
+    intPIDAlt=""
+    while ( [[ "$intPIDAlt" == "" ]] )
+    do
+        #sleep 0.1
+        echo -e "|- `fncHHMMSS 'norm.mS3'` --- Befehl wird ausgeführt..."
+        intPIDAlt=`ps -C $txtProzessName -o pid=`
+        sleep 0.1
+        intPIDAlt=`ps --pid $intPIDAlt -o pid=`
+    done
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Befehl wird ausgeführt..."
+    sleep 0.1
+    intPIDNeu=`ps -C $txtProzessName -o pid=`
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Neue PID:\\t$intPIDNeu"
+    sleep 0.5
+
+    # -PS Status anzeigen:
+    fncSTATUSlxps $txtProzessName
+
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Befehl beendet: \"$txtBefehlSystemctl $txtProzessName\""
+    #echo -e "|- `fncHHMMSS 'norm.mS3'`"
+    echo -e "|-"
+}
+
+if ( [[ "$*" == *-sound* ]] )
+then
+    fncSystemDStartRestart "pipewire"
+    echo -e "|-"
+    fncSystemDStartRestart "pipewire-pulse"
+
+    exit 0;
+fi
+###################################################################################################
+###################################################################################################
+
+
+
+
+###################################################################################################
+###################################################################################################
 # -Prozess Sonderfall: replace
 #
 # -ToDo: Zeitbedarf für das Neustarten ermitteln...
 #
 function fncProzessReplace {
     txtProzessReplaceName="$1"
-    
+
     # -Info zum gewählten Befehl anzeigen:
     echo -e "|- `fncHHMMSS 'norm.mS3'` --- Prozess Replace: \"$txtProzessReplaceName\""
-    
+
     # -PS Status anzeigen:
     fncSTATUSlxps $txtProzessReplaceName
-    
+
     intPIDReplaceAlt=`ps -C $txtProzessReplaceName -o pid=`
-    
+
     echo -e "|- `fncHHMMSS 'norm.mS3'` --- Bitte haben Sie einen Moment Geduld während der Befehl ausgeführt wird!"
     echo -e "|- `fncHHMMSS 'norm.mS3'` --- Starte Replace: \"$txtProzessReplaceName\""
     "$txtProzessReplaceName" --replace >/dev/null 2>&1 & disown
@@ -1678,33 +2021,30 @@ function fncProzessReplace {
     sleep 1
     echo -e "|- `fncHHMMSS 'norm.mS3'` --- Neue PID:\\t$pidKONSOLE"
     sleep 1
-    
+
     # -PS Status anzeigen:
     fncSTATUSlxps $txtProzessReplaceName
-    
+
     echo -e "|- `fncHHMMSS 'norm.mS3'` --- Replace beendet: \"$txtProzessReplaceName\""
     #echo -e "|- `fncHHMMSS 'norm.mS3'`"
     echo -e "|-"
 }
 
-if ( [[ "$*" == *-replace* ]] )
+if ( [[ "$*" == *-replace* ]] || [[ "$*" == *-display* ]] )
 then
-    fncProzessReplace "kwin_x11"
+    [[ -n "`ps -C kwin_x11 -o pid=`" ]] && fncProzessReplace "kwin_x11" || fncProzessReplace "kwin_wayland"
     echo -e "|-"
     fncProzessReplace "plasmashell"
-    
+
     exit 0;
 fi
+###################################################################################################
+###################################################################################################
 
 
 
 
 
-
-
-
-
-#exit 0;
 
 
 

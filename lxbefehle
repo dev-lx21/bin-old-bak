@@ -1,0 +1,462 @@
+#!/bin/bash
+# lx-tools script von -lx-
+
+
+pfad="$1"
+flag_update=$2
+flag_aufruf_intern=$3
+zeitSTARTutc=`date '+%s'`
+zeitSTART=`date -d @$zeitSTARTutc`
+zeitSTARTdateiname=`date -d @$zeitSTARTutc '+%F_%T'`
+zeitSTARTdateiname=${zeitSTARTdateiname//\-/}
+zeitSTARTdateiname=${zeitSTARTdateiname//:/}
+zeitSTARTdateiname=${zeitSTARTdateiname//_/\-}
+
+
+fmtFETT=`tput bold`
+fmtINVERS=`tput rev`
+fmtUNTERSTRICHEN=`tput smul`
+
+fmtCOLORfgBLAU=`tput setf 1`
+fmtCOLORfgGRUEN=`tput setf 2`
+fmtCOLORfgGELB=`tput setf 3`
+fmtCOLORfgROT=`tput setf 4`
+fmtCOLORbgBLAU=`tput setb 1`
+fmtCOLORbgGRUEN=`tput setb 2`
+fmtCOLORbgGELB=`tput setb 3`
+fmtCOLORbgROT=`tput setb 4`
+
+fmtRESET=`tput sgr0`
+
+
+datei=${0//*\//}
+titel="Nützliche Linux Befehle anzeigen!"
+benutzung=\
+"|- Benutzung:"\\n\
+"|- '$datei' [OPTIONEN]"\\n\
+"|- Öffnet ein Fenster zum Auswählen der gewünschten Kategorie und zeigt dann den"\\n\
+"|- entsprechenden Hilfetext an."\\n\
+"|-"\\n\
+"|- Optionen:"\\n\
+"|- -edit\\tNach Auswahl der Kategorie wird eine Sicherheitskopie der entsprechenden"\\n\
+"|- \\t\\tHilfedatei erstellt und dann die original Datei zum Bearbeiten geöffnet."\\n\
+"|-"
+
+
+# wird (fast) immer angezeigt:
+echo -e "|--------------------------------------------------------------------------------"
+echo -e "|- $datei -| $titel"
+echo -e "|--------------------------------------------------------------------------------"
+echo -e "|- "`date`
+echo -e "|-"
+echo -e $benutzung
+# version, GPL, autor...
+
+
+# ========================================================
+# ===== die sammlung von linux befehlen aus dem eigenen
+# ===== knowledge verzeichnis ausgeben:
+# =====
+# ===== /home/lx21/Dokumente/knowledge/
+# ===== linux-befehle-lx-allgemein.txt ,,,lx-server.txt
+# ===== linux-befehle-avconv.txt linux-befehle-mtp.txt linux-befehle-sip.txt
+# ========================================================
+
+
+
+
+auswahl_liste=$(kdialog --title="Kategorie wählen:" \
+--radiolist="<br>$titel<br><br>Bitte die gewünschte Kategorie auswählen!<br>" \
+linux-befehle-lx-allgemein.txt "Allgemeines (cp, grep,...)" off \
+linux-befehle-multimedia.txt "Multimedia (ffmpeg, youtube-dl)" off \
+linux-befehle-mtp.txt "MTP Einbindung" off \
+linux-befehle-network.txt "Netzwerk Konfiguration" off \
+linux-befehle-lx-server.txt "Server (srv.lx21: Cronjobs)" off \
+linux-befehle-sip.txt "SIP Nutzung (pjsua)" off \
+linux-befehle-systemverwaltung.txt "Systemverwaltung (sysctl, Plasma,...)" on) 
+
+if [ "$?" = 1 ]; then
+    echo -e "|- Sie haben die Auswahl abgebrochen, daher wird das Skript beendet!"
+    exit 0;
+fi
+
+
+
+
+
+txt_pfad="/home/lx21/Dokumente/knowledge/"$auswahl_liste
+
+strDATEIname="$auswahl_liste"
+strDATEIpfad="/home/lx21/Dokumente/knowledge/"
+
+function fncDATEIsichernDATEIbearbeiten {
+    # -Variablen sind entweder schon definiert und gesetzt oder sie werden mittels
+    #  $1 und $2 übergeben:
+    #strDATEIname="$1"
+    #strDATEIpfad="$2"
+    strDATEIendungBAK=".bak.$zeitSTARTdateiname"
+    
+    echo -e "|- Sicherung der Datei erstellen..."
+    echo -e "|- Name der Sicherung: $strDATEIname$strDATEIendungBAK"\\n"|-"
+    #errDATEIcp=`cp /home/$nutzer/bin/$datei.conf /home/$nutzer/bin/testCP/$datei.conf.bak.$zeitSTARTdateiname`
+    cp $strDATEIpfad$strDATEIname $strDATEIpfad$strDATEIname$strDATEIendungBAK 1>/dev/null 2>&1
+    errDATEIcp=$?
+    sleep 0.5
+    if ( [[ "$errDATEIcp" -gt "0" ]] )
+    then
+        echo -e "|- FEHLER: Sicherung nicht erstellt! Bitte prüfen Sie die Zugriffsrechte innerhalb"
+        echo -e "|- des Zielordners und Ihre eigenen Benutzerrechte. Das Skript wird jetzt beendet."\\n"|-"
+        exit 1;
+    else
+        echo -e "|- Sicherung erfolgreich erstellt!"
+        echo -e "|- Dateiname: $strDATEIname$strDATEIendungBAK"\\n"|-"
+    fi
+    
+    echo -e "|- Datei bearbeiten:"
+    echo -e "|- Befehl: 'vi $strDATEIpfad$strDATEIname'"
+    vi $strDATEIpfad$strDATEIname
+    errDATEIvi=$?
+#     echo -e "|- Status: $errDATEIvi\\t0=Keine Fehler! Bearbeitung erfolgreich abgeschlossen."
+#     echo -e "|-\\t\\t1=Fehler! Keine Rückmeldung über die Speichervorgänge. Bitte die Änderungen überprüfen!"
+#     echo -e "|-\\t\\t2=Fehler! Bearbeitung wurde entweder durch Benutzer oder anderen Prozess abgebrochen."
+    if ( [[ "$errDATEIvi" -gt "0" ]] )
+    then
+        echo -e "|- FEHLER: Keine Rückmeldung über den Speichervorgang. Sehr wahrscheinlich sind"
+        echo -e "|- ungenügende Zugriffsrechte (Benutzer und/oder Verzeichnis) daran Schuld."
+        echo -e "|- Bitte kontrollieren Sie die von Ihnen vorgenommenen Änderungen. Das Skript"
+        echo -e "|- wird jetzt beendet."\\n"|-"
+        exit 1;
+    else
+        echo -e "|- Datei erfolgreich gespeichert!"
+        echo -e "|- Dateiname: $strDATEIname"\\n"|-"
+    fi
+    
+    echo -e "|- Bearbeitung der Datei erfolgreich abgeschlossen!"\\n"|-"
+}
+
+
+
+[[ "$1" == "-edit" ]] && fncDATEIsichernDATEIbearbeiten
+
+
+
+echo -e "=== $auswahl_liste ======================================================"\\n"==="
+
+`echo -e cat $txt_pfad`
+
+[[ "$1" == "-edit" ]] && echo -e "|-"\\n"|- Sichern, Bearbeiten und Speichern der Datei erfolgreich abgeschlossen!"\\n"|- Sicherung: $strDATEIname$strDATEIendungBAK"\\n"|- Original Datei: $strDATEIname"\\n"|-"
+
+exit 0;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# START pfad-kontrolle -----------------------------------
+# den pfad pruefen, ggf korrigieren, ggf FEHLER ausgeben!
+# -ist bei internem aufruf nicht erforderlich:
+if ( [ "$flag_aufruf_intern" != "true" ] )
+  then
+  if ( [ "$pfad" != "" ] )
+  then
+  #echo -e "--- pfad-nicht-leer ---"
+  if [[ "$pfad" != */ ]]
+    then
+    #echo -e "--- pfad-hat-kein-slash ---"
+    pfad="$pfad/"
+  fi
+  else
+  #echo -e "--- pfad-ist-leer ---"
+  # aktueller ort wird als pfad angenommen:
+  pfad=`pwd`
+  pfad="$pfad/"
+  #kdialog --msgbox="Pfad: $pfad"
+  fi
+  # pfad pruefen und ggf FEHLER ausgeben:
+  if ( [ -d "$pfad" ] )
+    then
+    fehler=0
+    else
+    fehler=1
+    kdialog --title="FEHLER" --error="FEHLER:\nDas Verzeichnis lässt sich nicht öffnen. Bitte überprüfen Sie Ihre Eingabe! Vielleicht ein Tippfehler oder ungenügende Zugriffsrechte.\n\nVerzeichnis:\n$pfad\n\n\nDas Script wird beendet."
+    exit 0;
+  fi
+fi
+# ENDE pfad-kontrolle -----------------------------------
+
+
+# -----------------------------------------------
+# --- parameter liste beachten ------------------
+extension=".mp*"
+name_datei_playliste="00_alle_pls.m3u"
+name_datei_update="00_alle_pls_update.sh"
+#echo -e "$extension"
+suchpfad_speichern_pls=*$extension
+suchpfad=$pfad*$extension
+#echo -e "$suchpfad"
+flag_stop=0
+# -----------------------------------------------
+# -----------------------------------------------
+
+
+
+# wird nur beim ersten aufruf der datei ausgefuehrt:
+if ( [ "$flag_aufruf_intern" != "true" ] )
+  then
+  # script namen und zeit_start anzeigen:
+  echo -e "***"
+  echo -e "*** START: $zeit_start"
+  echo -e "***************************************************************"
+  echo -e "************** make m3u playlist script von -lx- **************"
+  echo -e "***************************************************************"
+  echo -e "***"
+  echo -e "*** Sonder- und Leerzeichen in Dateinamen korrigieren:"
+
+  # eventuelle sonder- und leerzeichen aus den dateinamen loeschen:
+  /home/lx21/bin/lxRENAME "$pfad" "false" "true"
+
+  echo -e "***"
+
+  # ein update script fuer diesen pfad erstellen:
+  touch $pfad$name_datei_update
+  echo -e "#!/bin/bash" > $pfad$name_datei_update
+  echo -e "# --- ein update script fuer die playliste ---" >> $pfad$name_datei_update
+  #echo -e "" >> $pfad$name_datei_update
+  echo -e "# aktueller ort wird als pfad angenommen:" >> $pfad$name_datei_update
+  echo -e "pfad=\`pwd\`" >> $pfad$name_datei_update
+  echo -e "pfad=\$pfad/" >> $pfad$name_datei_update
+  echo -e "$0 \$pfad true" >> $pfad$name_datei_update
+  chmod a+x $pfad$name_datei_update
+
+fi
+
+
+
+txtbox_pfad="\n\nVerzeichnis:\n$pfad"
+
+if ( [ "$flag_update" != "true" ] )
+ then
+ flag_update=false
+fi
+
+if ( [ "$flag_aufruf_intern" != "true" ] )
+ then
+ flag_aufruf_intern=false
+fi
+
+
+
+
+echo -e "***************************************************************"
+echo -e "*** Playliste erstellen in: $pfad"
+#echo -e "***************************************************************"
+
+
+
+for ia in $(ls --group-directories-first $pfad)
+ do
+ nix=0
+ # DEBUG infos:
+ #echo -e "DEBUG-flag_aufruf_intern: $flag_aufruf_intern"
+ #echo -e "DEBUG-ia: $ia"
+ #echo -e "DEBUG-pfad: $pfad"
+
+if ( [ -d "$pfad" ] && [ $pfad!="" ] )
+ then
+ ia=$pfad$ia
+ zusatz=""
+ #echo -e "---PFAD KOMPLETT: $ia"
+ # zusatz ist inzwischen unnötig!!!
+ #else
+ #zusatz="../"
+ #echo -e "---PFAD KOMPLETT: $pfad"
+fi
+
+
+
+if ( [ -d $ia ] )
+ then
+ pfad_uvz="$ia/"
+ suchpfad=$ia/*$extension
+ datei=$ia"/"$name_datei_playliste
+ datei_update=$ia"/"$name_datei_update
+ #echo -e "DEBUG-VERZEICHNIS: $ia"
+ $0 "$pfad_uvz" "$flag_update" "true"
+ #flag_aufruf_intern=false
+ continue
+ elif ( [ -d $pfad ] )
+ then
+ suchpfad=$pfad*$extension
+ datei=$pfad$name_datei_playliste
+ datei_update=$pfad$name_datei_update
+ flag_stop=1
+ #flag_aufruf_intern=false
+ else
+ suchpfad=*$extension
+ datei=$name_datei_playliste
+ datei_update=$name_datei_update
+ flag_stop=1
+ #flag_aufruf_intern=false
+fi
+
+
+
+
+
+#echo -e "*** Check auf Inhalt: ***"
+#echo -e "-suchpfad: $suchpfad"
+# falls extension nicht passt, wird zum naechsten datensatz gesprungen:
+if [[ "$ia" != *$extension ]]
+  then
+  #echo -e "-INFO: $ia passt nicht zum Suchstring: \"*$extension\""
+  continue
+fi
+
+#for i in $suchpfad
+# for i in $(ls --group-directories-first $pfad)
+#  do
+#  echo -e "-i: $i"
+#  #nix=$[nix+1]
+# 
+#  #if ( [ -f $i ] && [ "$i" != "*$extension" ] )
+#  #if [ [ -f $i ] && [ "$i" = *.mp* ] ]
+#  #if ( [[ -f $i ]] && [[ "$i" = *.mp* ]] )
+#  # funktioniert: if [[ "$i" = *.mp* ]]
+#  if [[ "$i" == *.mp* ]]
+#   then
+#   echo -e "--- extension passt zum suchstring: \"$extension\" ---"
+#   nix=$[nix+1]
+#   else
+#   # inhalt $i ist eine datei, aber endet nicht mit der korrekten
+#   # zeichenfolge. daher wird zum naechsten datensatz gesprungen!
+#   echo -e "--- FEHLER: extension der datei passt nicht zum suchstring: \"$extension\" ---"
+#   continue
+#  fi
+# 
+#  #echo -e "RENAME $i" | sed "s/ /_/g"
+#  #echo -e "---RENAME: $i"
+#  #rename 's/[^abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_ \-\.\/]/\-/g' "$i"
+#  #rename  's/ /_/g' "$i"
+#  #echo -e "---RENAME new: $i"
+#  #echo -e "- $i -- $nix -"
+# done
+# 
+# #if( [ "$nix"<2 ] )
+# if (("$nix"<2))
+#  then
+#  echo -e "...Nichts zu tun."
+#  continue
+# fi
+# echo -e "...done"
+
+
+
+
+#echo -e "-INFO: Datei erstellen..."
+z_id=0
+# ein update script fuer diese playliste erstellen:
+touch $datei_update
+echo -e "#!/bin/bash" > $datei_update
+echo -e "# --- ein update script fuer die playliste ---" >> $datei_update
+#echo -e "" >> $datei_update
+echo -e "# aktueller ort wird als pfad angenommen:" >> $datei_update
+echo -e "pfad=\`pwd\`" >> $datei_update
+echo -e "pfad=\$pfad/" >> $datei_update
+echo -e "$0 \$pfad true" >> $datei_update
+chmod a+x $datei_update
+
+
+# die playliste als datei erstellen:
+#echo -e "$datei"
+touch $datei
+#text="#EXTM3U"
+echo -e "#EXTM3U" > $datei
+#mkdir tmplxfileorder
+for i in $suchpfad
+ do
+ #echo -e "RENAME $i" | sed "s/ /_/g"
+ #echo -e "---COPY $i"
+ #echo -e "---RM oder MOVE $i"
+ echo -e "#EXTINF:$z_id,$zusatz$i" >> $datei
+ echo -e "$zusatz$i" >> $datei
+ z_id=$[z_id+1]
+ #ffmpeg -i $i -acodec copy -f segment -segment_time 300 $outfile
+ #ffmpeg -i $i -acodec copy -t 00:30:00 -ss 00:00:00 $outfile
+ #echo -e "...done"
+done
+
+zeit_ende=`date`
+if (($flag_stop==1))
+ then
+ echo -e "-DONE: $suchpfad"
+# if ( [ ! $flag_aufruf_intern ] )
+ if [[ "$flag_aufruf_intern" != true ]]
+  then
+  if [[ "$flag_update" == true ]]
+   then
+   kdialog --title="INFO" --msgbox="Update erfolgreich!$txtbox_pfad\n\n\n-ende:update_01-"
+   else
+   #echo -e "-MSGBOX: flag_stop"
+   kdialog --title="INFO" --msgbox="Anlegen der Dateien erfolgreich!$txtbox_pfad\n\n\n-ende:flag_stop-"
+  fi
+ fi
+ echo -e "-ENDE: flag_stop"
+ echo -e "-Gestartet: $zeit_start"
+ echo -e "-Beendet  : $zeit_ende"
+ echo -e "----------------------------------------"
+ exit 0;
+fi
+
+echo -e "-DONE: $suchpfad"
+
+# ende der ia schleife
+done
+
+zeit_ende=`date`
+if ( [ "$flag_update" == true ] && [ "$flag_aufruf_intern" != true ] )
+ then
+ #echo -e "-MSGBOX: update"
+ kdialog --title="INFO" --msgbox="Update erfolgreich!$txtbox_pfad\n\n\n-ende:update_02-"
+ echo -e "-ENDE: update"
+ echo -e "-Gestartet: $zeit_start"
+ echo -e "-Beendet  : $zeit_ende"
+ echo -e "----------------------------------------"
+ exit 0;
+fi
+
+zeit_ende=`date`
+if ( [ "$flag_aufruf_intern" != true ] )
+ then
+ #echo -e "-MSGBOX: normal"
+ kdialog --title="INFO" --msgbox="Anlegen der Dateien erfolgreich!$txtbox_pfad\n\n\n-ende:normal-"
+ echo -e "-ENDE: normal"
+ echo -e "-Gestartet: $zeit_start"
+ echo -e "-Beendet  : $zeit_ende"
+ echo -e "----------------------------------------"
+fi
+
+
+
+
+
+
+
+
+
+
+
+
+

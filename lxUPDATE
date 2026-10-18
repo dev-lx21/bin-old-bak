@@ -5,6 +5,8 @@
 # ---------------------------------------------------------------------------------------
 # ---------------------------------------------------------------------------------------
 # ----- ToDo:
+# -Kernel Verwaltung: linux-image UND installiert
+#  aptitude search 'linux-image'.'6.1.0'.*.'amd64' | wc -l
 #
 # ----- DONE:
 #
@@ -12,11 +14,19 @@
 #
 # ---------------------------------------------------------------------------------------
 # ---------------------------------------------------------------------------------------
-# [[ -z "$1" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return
+# [[ -z "$1" ]] && echo -e "|- ${FUNCNAME[0]} FEHLER:"\\t"1. Argument nicht angegeben!" && return 11
+# [[ -z "$2" ]] && echo -e "|- ${FUNCNAME[0]} FEHLER:"\\t"2. Argument nicht angegeben!" && return 12
 # -------------------------------------------------------------------------------------------------
 # ----- START -------------------------------------------------------------------------------------
 # ----- ENDE --------------------------------------------------------------------------------------
 # -------------------------------------------------------------------------------------------------
+
+
+
+#Einige der neuen FriskeeschülerInnen hatten sich zum besseren Verständnis des unsichtbaren, verwunschenen, verfahrenen und versalzenen Buch Friskee sogenannte kommentierte Versionen gekauft und waren nun uneinig, welche Auslegung der Regeln korrekt und was verschiedene Abkürzungen wohl wirklich bedeuteten. Der Friskeemeister (Ein noch recht junger Meister, groß, aber noch nicht fett.) der gerade den Unterricht hielt, hielt inne und sagte dann wortwörtlich: "Das wüsste ich auch gerne..."
+#Antworten von garantiert großen, fetten Friskeemeistern gibt es heute im Stadion: 1530. Friskee. PadKa.
+
+
 
 
 
@@ -85,7 +95,6 @@ function fncAUSLESENversion {
     
     # -Nur die Kategorie ausschneiden:
     dateiVersionInfoKategorie=${dateiVersionKomplettTxt//_*/}
-    #  TODO
     
     # -Nur den Infotext ausschneiden: 
     dateiVersionInfoTxt=${dateiVersionKomplettTxt//$dateiVersionInfoKategorie\_/}
@@ -97,6 +106,62 @@ function fncAUSLESENversion {
     
 }
 [ -z $dateiVersionInfoNr ] && fncAUSLESENversion
+
+
+function fncHHMMSS {
+    case "$1" in
+        ( nurZAHLEN )
+            echo -en `date '+%H%M%S'` ;;
+        ( nurSS )
+            echo -en `date '+%S'` ;;
+        ( nurSS.S )
+            echo -en `date '+%S.%N'` ;;
+        ( nurSS.mS3 )
+            HMSmS=`date '+%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:3}
+            echo -en $HMSxyz"."$mSxyz ;;
+        ( norm.mS2 )
+            HMSmS=`date '+%H:%M:%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:2}
+            echo -en $HMSxyz"."$mSxyz ;;
+        ( norm.mS3 )
+            HMSmS=`date '+%H:%M:%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:3}
+            echo -en $HMSxyz"."$mSxyz ;;
+        (*)
+            echo -en `date '+%H:%M:%S'` ;;
+    esac
+    #echo -en `date '+%H:%M:%S'`
+}
+
+function fncYEAR1231 {
+    case "$1" in
+        ( nurZAHLEN )
+            echo -en `date '+%Y%m%d'`
+            ;;
+        ( YEAR )
+            echo -en `date '+%Y'`
+            ;;
+        ( 12 )
+            echo -en `date '+%m'`
+            ;;
+        ( 31 )
+            echo -en `date '+%d'`
+            ;;
+        ( 1231 )
+            echo -en `date '+%m%d'`
+            ;;
+        (*)
+            echo -en `date '+%Y-%m-%d'`
+            ;;
+    esac
+}
 
 
 
@@ -130,8 +195,14 @@ stsCheckPaketExitcode=""
 
 flagInfoPopup="true"
 
-layoutAusgabeAnfang="|- "
-
+txtZeileAnfang="|-"
+function fncAusgabeZeileAnfang {
+    #txtAusgabeDatumZeit=`fncYEAR1231 'nurZAHLEN' && echo -en " " && fncHHMMSS 'norm.mS3'`
+    txtAusgabeDatum=`fncYEAR1231 'nurZAHLEN'`
+    txtAusgabeZeit=`fncHHMMSS 'norm.mS3'`
+    layoutAusgabeZeileAnfang="$txtZeileAnfang [$txtAusgabeZeit] "
+    echo -en "$layoutAusgabeZeileAnfang"
+}
 # ---------------------------------------------------------------------------------------
 # ---------------------------------------------------------------------------------------
 
@@ -140,7 +211,7 @@ layoutAusgabeAnfang="|- "
 
 
 
-function fncCheckPaketInstalliertVar {
+function fncCheckInstalliertePakete {
     # -Überprüfen ob ein bestimmtes Paket installiert ist. Erfordert mindestens einen
     #  Paketnamen als Argument.
     # -Übergabe der Informationen mittels zweier Variablen:
@@ -149,25 +220,47 @@ function fncCheckPaketInstalliertVar {
     # -Wird $2 übergeben und enthält "stsCheckPaketAusgabe", wird $stsCheckPaketAusgabe mittels echo
     #  ausgegeben. Somit kann die Funktion direkt in einem Vergleich genutzt werden!
     #[ ! "$1" ] && stsCheckPaketAusgabe="FEHLER" && stsCheckPaketExitcode="1" && return
+    # -DEBUG:
+    #kdialog --msgbox "DEBUG: ${FUNCNAME[0]} - $*"
+    #echo -e "--- DEBUG: ${FUNCNAME[0]} - $*"
+
     [[ -z "$1" ]] && stsCheckPaketExitcode="$?" && stsCheckPaketAusgabe="FEHLER: Keine Argumente übergeben!"
     [[ -z "$1" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return
     
     #[[ `apt list $1 --installed 2>/dev/null` == *$1* ]] && stsCheckPaketAusgabe="true" || stsCheckPaketAusgabe="false"
     tmpCheckPaket="`apt list $1 --installed 2>/dev/null`"
     stsCheckPaketExitcode="$?"
-    [[ "$tmpCheckPaket" == *$1* ]] && stsCheckPaketAusgabe="true" || stsCheckPaketAusgabe="false"
-    #stsCheckPaketExitcode="$?"
-    
+
+    tmpCheckPaket2="`$1 --version >/dev/null 2>&1`"
+    stsCheckPaketExitcode2="$?"
+
+    #[[ "$tmpCheckPaket" == *$1* ]] && stsCheckPaketAusgabe="true" || stsCheckPaketAusgabe="false"
+    stsCheckPaketAusgabe="false"
+    [[ "$tmpCheckPaket" == *$1* ]] || [[ "$stsCheckPaketExitcode2" == "0" ]] && stsCheckPaketAusgabe="true"
+
     [[ "$2" ]] && [[ "$2" == "stsCheckPaketAusgabe" ]] && echo -en "$stsCheckPaketAusgabe"
 }
 
-function fncTXTPaketInstalliert {
-    # -Die fncCheckPaketInstalliertVar mit dem stsCheckPaketAusgabe Flag starten und
+function fncAusgabeInstalliertePakete {
+    # -Die fncCheckInstalliertePakete mit dem stsCheckPaketAusgabe Flag starten und
     #  das Ergebnis direkt auswerten:
-    [[ `fncCheckPaketInstalliertVar "$1" "stsCheckPaketAusgabe"` == "true" ]] && txtCheckPaketAusgabe="$1 ist installiert." && echo -e "(ist installiert)"
-    [[ `fncCheckPaketInstalliertVar "$1" "stsCheckPaketAusgabe"` == "false" ]] && txtCheckPaketAusgabe="$1 ist nicht installiert." && echo -e "(ist NICHT installiert)"
+    [[ `fncCheckInstalliertePakete "$1" "stsCheckPaketAusgabe"` == "true" ]] && txtCheckPaketAusgabe="$1 ist installiert." && echo -e "(ist installiert)"
+    [[ `fncCheckInstalliertePakete "$1" "stsCheckPaketAusgabe"` == "false" ]] && txtCheckPaketAusgabe="$1 ist nicht installiert." && echo -e "(ist NICHT installiert)"
 }
 
+
+
+
+
+
+
+if ( [[ "$1" == "-v" ]] )
+then
+    # -Versions Info wurde gewählt:
+    echo -e "|- $datei Version anzeigen:"
+    echo -e "|- $dateiVersionInfoNr ($dateiVersionInfoKategorie: $dateiVersionInfoTxt)"
+    exit 0;
+fi
 
 
 
@@ -175,7 +268,8 @@ function fncTXTPaketInstalliert {
 
 
 #if ( [ "$1" != "-q" ] && [ "$1" != "-qs" ] && [ "$1" != "-sq" ] ) 
-if [[ "$1" != -*q* ]]
+#if ( [[ "$1" != -*q* ]] && [[ "$1" != -*v* ]] )
+if ( [[ "$1" != -*q* ]] )
 then
     # wird (fast) immer angezeigt:
     echo -e "|--------------------------------------------------------------------------------"
@@ -194,6 +288,7 @@ then
         echo -e $benutzung
         echo -e "|- Optionen:"
         echo -e "|- -h     Diesen Hilfetext anzeigen. Die Option muss alleine stehen."
+        echo -e "|- -v     Die aktuelle Version anzeigen. Die Option muss alleine stehen."
         echo -e "|- -i     Informationen über das installierte System anzeigen. Die Option muss alleine stehen."
         echo -e "|- -I     Die aktuellen Systeminfos abspeichern: $dateiAUSGABEspeichern"
         echo -e "|- -s     Nach Paketen suchen (mittels Aptitude). Erfordert ein Argument als Suchbegriff."
@@ -211,8 +306,8 @@ then
         echo -e "|- -APTOPTION Paketname"
         echo -e "|-        Apt wird mit der angegebenen APTOPTION und dem PAKETNAMEN aufgerufen. Alle original"
         echo -e "|-        Optionen von Apt können verwendet werden. (list, show, remove...)"
-        echo -e "|- -A     Aptitude im interaktiven Modus starten. `fncTXTPaketInstalliert aptitude`"
-        echo -e "|- -S     Synaptic starten. Funktioniert nur unter einem laufenden X-Server. `fncTXTPaketInstalliert synaptic`"
+        echo -e "|- -A     Aptitude im interaktiven Modus starten. `fncAusgabeInstalliertePakete aptitude`"
+        echo -e "|- -S     Synaptic starten. Funktioniert nur unter einem laufenden X-Server. `fncAusgabeInstalliertePakete synaptic`"
         echo -e "|- Manche Optionen können miteinander kombiniert werden. '-qs' ist das gleiche wie '-sq'."
         echo -e "|-"
         echo -e "|- Beispiele:"
@@ -352,21 +447,26 @@ function fncBEFEHL {
     
     if ( [[ "$flagTESTDRIVE" != "true" ]] )
     then
-        echo -e "$txtAUSGABEanfang""AUSFÜHREN: '$txtBEFEHL'"
+        echo -e "`fncAusgabeZeileAnfang`""AUSFÜHREN: '$txtBEFEHL'"
         actionBEFEHL="echo -e $txtBEFEHL"
         #[[ "$txtBEFEHL" == "apt update" ]] && `$actionBEFEHL` >$dateiTMPBefehlAusgabe 2>$dateiTMPBefehlFehler || `$actionBEFEHL` 2>$dateiTMPBefehlFehler
         [[ "$txtBEFEHL" == "apt ""$strBefehlAutoYes""update" ]] && `$actionBEFEHL` 2>$dateiTMPBefehlFehler | tee $dateiTMPBefehlAusgabe || `$actionBEFEHL` 2>$dateiTMPBefehlFehler
         stsBEFEHL=$?
-        
+        #echo -e "---DEBUG nach-Aufruf-actionBEFEHL -----------------------------------"
+
         #[ -f $dateiTMPBefehlAusgabe ] && cat $dateiTMPBefehlAusgabe
         [ -f $dateiTMPBefehlFehler ] && [[ -n "`cat $dateiTMPBefehlFehler`" ]] && txtBefehlFehler="`cat $dateiTMPBefehlFehler`"
         
         # -Ausgabe von 'apt update' auswerten:
         [[ "$txtBEFEHL" == "apt ""$strBefehlAutoYes""update" ]] && fncCheckAusgabeAptUpdate "$dateiTMPBefehlAusgabe"
         
+        # -Bibliotheken bewusst nicht anzeigen: JA!!!
+
+
+
         # -Exit-Status auswerten:
-        #[ $stsBEFEHL -eq 0 ] && echo -e "$txtAUSGABEanfang""ERFOLGREICH: Befehl: '$txtBEFEHL'"\\n"$txtAUSGABEanfang""ERFOLGREICH: Status: '$stsBEFEHL'" || echo -e "$txtAUSGABEanfang""FEHLER: Befehl: '$txtBEFEHL'"\\n"$txtAUSGABEanfang""FEHLER: Status: '$stsBEFEHL'"\\n"$txtAUSGABEanfang""FEHLER: Info:   '$txtBefehlFehler'"
-        [ $stsBEFEHL -eq 0 ] && echo -e "$txtAUSGABEanfang""ERFOLGREICH: Befehl: '$txtBEFEHL'" || echo -e "$txtAUSGABEanfang""FEHLER: Befehl: '$txtBEFEHL'"\\n"$txtAUSGABEanfang""FEHLER: Status: '$stsBEFEHL'"\\n"$txtAUSGABEanfang""FEHLER: Info:   '$txtBefehlFehler'"
+        #[ $stsBEFEHL -eq 0 ] && echo -e "`fncAusgabeZeileAnfang`""ERFOLGREICH: Befehl: '$txtBEFEHL'"\\n"`fncAusgabeZeileAnfang`""ERFOLGREICH: Status: '$stsBEFEHL'" || echo -e "`fncAusgabeZeileAnfang`""FEHLER: Befehl: '$txtBEFEHL'"\\n"`fncAusgabeZeileAnfang`""FEHLER: Status: '$stsBEFEHL'"\\n"`fncAusgabeZeileAnfang`""FEHLER: Info:   '$txtBefehlFehler'"
+        [ $stsBEFEHL -eq 0 ] && echo -e "`fncAusgabeZeileAnfang`""ERFOLGREICH: Befehl: '$txtBEFEHL'" || echo -e "`fncAusgabeZeileAnfang`""FEHLER: Befehl: '$txtBEFEHL'"\\n"`fncAusgabeZeileAnfang`""FEHLER: Status: '$stsBEFEHL'"\\n"`fncAusgabeZeileAnfang`""FEHLER: Info:   '$txtBefehlFehler'"
         [ -f $dateiTMPBefehlAusgabe ] && rm $dateiTMPBefehlAusgabe
         [ -f $dateiTMPBefehlFehler ] && rm $dateiTMPBefehlFehler
         
@@ -377,10 +477,10 @@ function fncBEFEHL {
             [[ "$txtBEFEHL" == "apt ""$strBefehlAutoYes""update" ]] && [ -n "$flagCheckAusgabeAptUpdate" ] && kdialog --title "$datei.$$" --msgbox "<b>$datei.Info:</b><br><br>Es sind Aktualisierungen verfügbar!<br><br>" 2>/dev/null &
         fi
     else
-        echo -e "$txtAUSGABEanfang""TESTMODUS: '$txtBEFEHL'"
+        echo -e "`fncAusgabeZeileAnfang`""TESTMODUS: '$txtBEFEHL'"
         stsBEFEHL=$?
     fi
-    echo -e "$txtAUSGABEanfang"
+    echo -e "`fncAusgabeZeileAnfang`"
     return $stsBEFEHL;
 }
 
@@ -441,7 +541,8 @@ function fncARGUMENTEcheck {
             esac
             #strAPTOPTION=${i//\-/}
             #echo -e "|- BEFEHL: apt $strAPTOPTION $strARGUMENTEkomplett"
-            fncBEFEHL "apt $strAPTOPTION $strARGUMENTEkomplett" "$layoutAusgabeAnfang"
+
+            fncBEFEHL "apt $strAPTOPTION $strARGUMENTEkomplett" "`fncAusgabeZeileAnfang`"
             exit 0;
         fi
         if ( [[ "$i" == --* ]] )
@@ -458,7 +559,8 @@ function fncARGUMENTEcheck {
             #strAPTOPTION=${i//\-/}
             #echo -e "|- BEFEHL: apt $strAPTOPTION $strARGUMENTEkomplett"
             #apt $strAPTOPTION $strARGUMENTEkomplett
-            fncBEFEHL "apt $strAPTOPTION $strARGUMENTEkomplett" "$layoutAusgabeAnfang"
+
+            fncBEFEHL "apt $strAPTOPTION $strARGUMENTEkomplett" "`fncAusgabeZeileAnfang`"
             exit 0;
         fi
         #exit 0;
@@ -496,6 +598,11 @@ fncOptionenAuslesenZuweisen $@
 
 # ===== ENDE Standard Optionen definieren, auslesen und zuweisen ==================================
 # =================================================================================================
+
+
+
+
+
 
 
 
@@ -565,13 +672,15 @@ then
     strBefehlSonderfall="aptitude"
     
     # -Prüfen ob Sonderfall installiert ist:
-    fncCheckPaketInstalliertVar "$strBefehlSonderfall"
+    fncCheckInstalliertePakete "$strBefehlSonderfall"
     
+
+
     # -Sonderfall ist NICHT installiert:
-    [ "$stsCheckPaketAusgabe" != "true" ] && echo -e "$layoutAusgabeAnfang FEHLER: '$strBefehlSonderfall' ist nicht oder nicht korrekt installiert! Bitte beachten Sie die Ausgabe\\n$layoutAusgabeAnfang         in der Konsole. Nähere Infos finden Sie auch in der Hilfe. ('$datei -h')\\n$layoutAusgabeAnfang" && exit 1;
+    [ "$stsCheckPaketAusgabe" != "true" ] && echo -e "`fncAusgabeZeileAnfang` FEHLER: '$strBefehlSonderfall' ist nicht oder nicht korrekt installiert! Bitte beachten Sie die Ausgabe\\n`fncAusgabeZeileAnfang`         in der Konsole. Nähere Infos finden Sie auch in der Hilfe. ('$datei -h')\\n`fncAusgabeZeileAnfang`" && exit 1;
     
     # -Sonderfall ist installiert:
-    fncBEFEHL "$strBefehlSonderfall" "$layoutAusgabeAnfang"
+    fncBEFEHL "$strBefehlSonderfall" "`fncAusgabeZeileAnfang`"
     strBefehlSonderfall=""
     exit 0;
 fi
@@ -583,13 +692,15 @@ then
     strBefehlSonderfall="synaptic"
     
     # -Prüfen ob Sonderfall installiert ist:
-    fncCheckPaketInstalliertVar "$strBefehlSonderfall"
+    fncCheckInstalliertePakete "$strBefehlSonderfall"
+
+
     
     # -Sonderfall ist NICHT installiert:
-    [ "$stsCheckPaketAusgabe" != "true" ] && echo -e "$layoutAusgabeAnfang FEHLER: '$strBefehlSonderfall' ist nicht oder nicht korrekt installiert! Bitte beachten Sie die Ausgabe\\n$layoutAusgabeAnfang         in der Konsole. Nähere Infos finden Sie auch in der Hilfe. ('$datei -h')\\n$layoutAusgabeAnfang" && exit 1;
+    [ "$stsCheckPaketAusgabe" != "true" ] && echo -e "`fncAusgabeZeileAnfang` FEHLER: '$strBefehlSonderfall' ist nicht oder nicht korrekt installiert! Bitte beachten Sie die Ausgabe\\n`fncAusgabeZeileAnfang`         in der Konsole. Nähere Infos finden Sie auch in der Hilfe. ('$datei -h')\\n`fncAusgabeZeileAnfang`" && exit 1;
     
     # -Sonderfall ist installiert:
-    fncBEFEHL "$strBefehlSonderfall" "$layoutAusgabeAnfang"
+    fncBEFEHL "$strBefehlSonderfall" "`fncAusgabeZeileAnfang`"
     strBefehlSonderfall=""
     exit 0;
 fi
@@ -605,17 +716,24 @@ fi
 if ( [[ "$1" == "" ]] || ( [[ "$1" == -*y* ]] && [[ "$2" == "" ]] ) || ( [[ "$string1" == "-qy" ]] && [[ "$string2" == "" ]] ) )
 then
     # -Zusätzliche Befehle ausführen:
-    #fncBEFEHL "youtube-dl -U" "$layoutAusgabeAnfang"
-    [[ `fncCheckPaketInstalliertVar "youtube-dl" "stsCheckPaketAusgabe"` == "true" ]] && fncBEFEHL "youtube-dl -U" "$layoutAusgabeAnfang"
-    [[ `fncCheckPaketInstalliertVar "yt-dlp" "stsCheckPaketAusgabe"` == "true" ]] && fncBEFEHL "yt-dlp -U" "$layoutAusgabeAnfang"
+    #fncBEFEHL "youtube-dl -U" "`fncAusgabeZeileAnfang`"
+
+    #[[ `fncCheckInstalliertePakete "youtube-dl" "stsCheckPaketAusgabe"` == "true" ]] && fncBEFEHL "youtube-dl -U" "`fncAusgabeZeileAnfang`"
+
+    #fncCheckInstalliertePakete "yt-dlp" "stsCheckPaketAusgabe"
+
+    [[ `fncCheckInstalliertePakete "yt-dlp" "stsCheckPaketAusgabe"` == "true" ]] && [[ "`apt policy "yt-dlp" 2>&1`" == *Installiert:*keine* ]] && fncBEFEHL "yt-dlp -U" "`fncAusgabeZeileAnfang`"
     #echo -e "|-"
     # -$1 leer
     # -normales update
     #echo -e "|- BEFEHL: apt update && apt full-upgrade"
     #apt update && apt full-upgrade
-    fncBEFEHL "apt ""$strBefehlAutoYes""update" "$layoutAusgabeAnfang"
+
+
+
+    fncBEFEHL "apt ""$strBefehlAutoYes""update" "`fncAusgabeZeileAnfang`"
     #echo -e "|-"
-    fncBEFEHL "apt ""$strBefehlAutoYes""full-upgrade" "$layoutAusgabeAnfang"
+    fncBEFEHL "apt ""$strBefehlAutoYes""full-upgrade" "`fncAusgabeZeileAnfang`"
     exit 0;
 else
     fncARGUMENTEzusammen $*
@@ -639,7 +757,10 @@ else
             # -suche starten
             #echo -e "|- BEFEHL: aptitude search $strARGUMENTEkomplett" 
             #aptitude search $strARGUMENTEkomplett
-            fncBEFEHL "aptitude search $strARGUMENTEkomplett" "$layoutAusgabeAnfang"
+
+
+
+            fncBEFEHL "aptitude search $strARGUMENTEkomplett" "`fncAusgabeZeileAnfang`"
             exit 0;
         fi
     elif ( [[ "$1" == -*q* ]] ) 
@@ -649,14 +770,17 @@ else
         flagInfoPopup="false"
         if ( ( [[ "$2" == "" ]] ) || ( [[ "$2" == -*y* ]] && [[ "$3" == "" ]] ) ) 
         then
-            # -$1 ist -q, $2 leer
+            # -$1 ist -q, $2 ist leer oder -y, $3 leer
             # -normales update im QUIET-MODE
             #echo -e "|- BEFEHL: apt update && apt full-upgrade"
             #apt update && apt full-upgrade
-            [[ `fncCheckPaketInstalliertVar "youtube-dl" "stsCheckPaketAusgabe"` == "true" ]] && fncBEFEHL "youtube-dl -U" "$layoutAusgabeAnfang"
-            [[ `fncCheckPaketInstalliertVar "yt-dlp" "stsCheckPaketAusgabe"` == "true" ]] && fncBEFEHL "yt-dlp -U" "$layoutAusgabeAnfang"
-            fncBEFEHL "apt ""$strBefehlAutoYes""update" "$layoutAusgabeAnfang"
-            fncBEFEHL "apt ""$strBefehlAutoYes""full-upgrade" "$layoutAusgabeAnfang"
+
+
+
+            [[ `fncCheckInstalliertePakete "youtube-dl" "stsCheckPaketAusgabe"` == "true" ]] && fncBEFEHL "youtube-dl -U" "`fncAusgabeZeileAnfang`"
+            [[ `fncCheckInstalliertePakete "yt-dlp" "stsCheckPaketAusgabe"` == "true" ]] && fncBEFEHL "yt-dlp -U" "`fncAusgabeZeileAnfang`"
+            fncBEFEHL "apt ""$strBefehlAutoYes""update" "`fncAusgabeZeileAnfang`"
+            fncBEFEHL "apt ""$strBefehlAutoYes""full-upgrade" "`fncAusgabeZeileAnfang`"
             exit 0;
         else
             # -$1 ist -q, $2 ist -y, $3 nicht leer
@@ -664,8 +788,11 @@ else
             # -VORSICHT: script variablen verschieben sich!
             #echo -e "|- BEFEHL: apt update && apt install $strARGUMENTEkomplett" 
             #apt update && apt install $strARGUMENTEkomplett
-            fncBEFEHL "apt ""$strBefehlAutoYes""update" "$layoutAusgabeAnfang"
-            fncBEFEHL "apt ""$strBefehlAutoYes""install $strARGUMENTEkomplett" "$layoutAusgabeAnfang"
+
+
+
+            fncBEFEHL "apt ""$strBefehlAutoYes""update" "`fncAusgabeZeileAnfang`"
+            fncBEFEHL "apt ""$strBefehlAutoYes""install $strARGUMENTEkomplett" "`fncAusgabeZeileAnfang`"
             exit 0;
         fi
     fi
@@ -685,8 +812,11 @@ else
     flagInfoPopup="false"
     #echo -e "|- BEFEHL: apt update && apt install $strARGUMENTEkomplett"
     #apt update && apt install $strARGUMENTEkomplett
-    fncBEFEHL "apt ""$strBefehlAutoYes""update" "$layoutAusgabeAnfang"
-    fncBEFEHL "apt ""$strBefehlAutoYes""install $strARGUMENTEkomplett" "$layoutAusgabeAnfang"
+
+
+
+    fncBEFEHL "apt ""$strBefehlAutoYes""update" "`fncAusgabeZeileAnfang`"
+    fncBEFEHL "apt ""$strBefehlAutoYes""install $strARGUMENTEkomplett" "`fncAusgabeZeileAnfang`"
     exit 0;
 fi 
 

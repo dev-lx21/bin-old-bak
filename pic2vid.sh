@@ -1,0 +1,98 @@
+#!/bin/bash
+########################################################################
+#
+# pic2vid
+# Konvertiert mehrere Fotos zu einem Video (Zeitraffer)
+#
+# GNU General Public License
+# 2012 by Emanuel Duss
+#
+########################################################################
+
+########################################################################
+# Variabeln
+DIR="$1"
+PICDIR="pic2vid"
+SMALLDIR="$DIR/$PICDIR"
+SIZE="x1080"
+QUALITY="90"
+OUTPUTFILE="output.mpg"
+CODEC="libx264"
+FRAMESPERSECOND="25"
+
+########################################################################
+# Funktionen
+Printusage () {
+  echo -e "Usage:
+  $0 directory"
+}
+
+########################################################################
+# Main
+
+# Prüfe Fehler
+if [ -z "$1" ]
+then
+  Printusage
+  exit 1
+fi
+
+if [ ! -d "$DIR" ]
+then
+  echo -e "$DIR ist kein Verzeichnis"
+  Printusage
+  exit 1
+fi
+
+if [ -d "$SMALLDIR" ]
+then
+  echo -e "Verzeichnis für aufzubereitende Fotos bereits vorhanden."
+else
+  mkdir "$SMALLDIR"
+fi
+if [ ! -d "$SMALLDIR" ]
+then
+  echo -e "Kann $SMALLDIR nicht anlegen. Bitte Berechtigungen prüfen."
+  exit 1
+fi
+
+cd $DIR
+
+
+# Fotos verkleinern (nur, wenn noch nicht verkleinert)
+TOTAL="`ls *.[Jj][Pp][Gg] | wc -l`"
+COUNT="1"
+for file in *.[Jj][Pp][Gg]
+do
+  if [ -f "${PICDIR}/$file" ]
+  then
+    echo -e "Überspringe $file, da bereits konvertiert (${PICDIR}/$file)"
+  else
+    echo -e "$file: Foto $COUNT von $TOTAL ($((100 * $COUNT / $TOTAL))%)"
+    convert -resize $SIZE -quality $QUALITY "$file" "${PICDIR}/$file"
+  fi
+  ((COUNT++))
+done
+
+# Fotos umbenennen (in Form wie 0001.jpg bis 2342.jpg)
+cd $PICDIR
+LENGTH="`ls *.[Jj][Pp][Gg] | wc -l | wc -L`"
+NUMBER="1"
+for file in *.[Jj][Pp][Gg]
+do
+  NEWNAME="`printf %0${LENGTH}d $NUMBER`.jpg"
+  if [ -f "$NEWNAME" ]
+  then
+    echo -e "Datei $file bereits umbenannt. OK."
+  else
+    # Symlink statt umbenennen, damit die Prüfung ob schon konvertiert auch funktioniert
+    ln -s "$file" "`printf %0${LENGTH}d $NUMBER`".jpg
+  fi
+  ((NUMBER++))
+done
+
+# Bilder mit ffmpeg zu Video zusammenfügen
+ffmpeg -f image2 -i %0${LENGTH}d.jpg -r $FRAMESPERSECOND -vcodec $CODEC ../$OUTPUTFILE
+
+# EOF
+

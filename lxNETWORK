@@ -69,6 +69,7 @@ function fncAuslesenIPAdressen {
 }
 fncAuslesenIPAdressen
 
+#echo -e "--- DEBUG $strIPAdresseEigene - $strIPAdresseGateway" && exit 0;
 
 
 

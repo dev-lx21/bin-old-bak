@@ -178,9 +178,9 @@ auswahlACTION=$(kdialog --title="lx21.$dateiNameKurz" --radiolist="<div align=ce
 Datei:<br> \
 \"$argDateiName\"<br><br> \
 Die Datei mit einem der folgenden Programme öffnen:<br></div>" \
-"/usr/bin/vlc --started-from-file $argDateiName" "VLC - Video Player" on \
-"/usr/bin/kid3 dir $argDateiName" "Kid3 - Meta Tag Bearbeitung" off \
-"exit 1;" "Vorgang abbrechen..." off)
+"vlc" "VLC - Video Player" on \
+"kid3" "Kid3 - Meta Tag Bearbeitung" off \
+"exit" "Vorgang abbrechen..." off)
 #actionGRAFIK "Nur Grafik (wget)" off  --geometry="600x500")
 checkDIALOG=$(echo -e "$?")
 checkDIALOGfehler=""
@@ -189,14 +189,17 @@ case "$checkDIALOG" in
     (0)
         # -Case für Eingabeüberwachung:
         case "$auswahlACTION" in
-            ("/usr/bin/vlc --started-from-file $argDateiName")
-                actionBEFEHL="$auswahlACTION"
+            ("vlc")
+                #actionBEFEHL="/usr/bin/vlc --started-from-file \\"$argDateiName\\""
+                #actionBEFEHL="/usr/bin/vlc --started-from-file ""$argDateiName"
+                actionBEFEHL="/usr/bin/vlc --started-from-file "
                 ;;
-            ("/usr/bin/kid3 dir $argDateiName")
-                actionBEFEHL="$auswahlACTION"
+            ("kid3")
+                #actionBEFEHL="/usr/bin/kid3 dir $argDateiName"
+                actionBEFEHL="/usr/bin/kid3 dir "
                 ;;
-            ("exit 1;")
-                actionBEFEHL="$auswahlACTION"
+            ("exit")
+                actionBEFEHL="exit 1;"
                 ;;
             (*)
                 checkDIALOGfehler="FEHLER:<br>Die Auswahl hat keine Daten übermittelt! Bitte erneut auswählen."
@@ -230,9 +233,10 @@ fi
 
 
 
-# -Auswahl wird ausgeführt:
-
-`$auswahlACTION &`
+# -Befehl wird ausgeführt:
+#`$auswahlACTION &`
+#actionBEFEHL="echo -e $actionBEFEHL"
+`$actionBEFEHL"$argDateiName" &`
 
 exit 0;
 

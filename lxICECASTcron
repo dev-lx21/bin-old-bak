@@ -302,7 +302,6 @@ function fncECHOlx () {
 function fncECHOlxD () {
     # -Erwartet einen String zum Ausgeben: $1
     # --Ausgabe am Bildschirm
-    # --Ausgabe in die Logdatei
     if ( [[ "$1" != "" ]] )
     then
         echo -e "$1"
@@ -312,7 +311,6 @@ function fncECHOlxD () {
 
 function fncECHOlxL () {
     # -Erwartet einen String zum Ausgeben: $1
-    # --Ausgabe am Bildschirm
     # --Ausgabe in die Logdatei
     if ( [[ "$1" != "" ]] )
     then
@@ -333,6 +331,7 @@ function fncECHOlxP {
 
 function fncECHOlxn () {
     # -Erwartet einen String zum Ausgeben: $1
+    # -Es wird keine neue Zeile erzeugt!!!
     # --Ausgabe am Bildschirm
     # --Ausgabe in die Logdatei
     if ( [[ "$1" != "" ]] )
@@ -424,6 +423,25 @@ function fncLayoutHRFullScreen {
 fncLayoutHRFullScreen >/dev/null
 
 
+typeset -i intLogZeilenNummer="0"
+function fncAusgabeLogZeileStartNummeriert {
+    intLogZeilenNummer=intLogZeilenNummer+7
+    txtLogZeilenNummer="$intLogZeilenNummer"
+
+    #(( $intLogZeilenNummer < 10000 )) && txtLogZeilenNummer=" $txtLogZeilenNummer"
+    (( $intLogZeilenNummer < 1000 )) && txtLogZeilenNummer=" $txtLogZeilenNummer"
+    (( $intLogZeilenNummer < 100 )) && txtLogZeilenNummer=" $txtLogZeilenNummer"
+    (( $intLogZeilenNummer < 10 )) && txtLogZeilenNummer=" $txtLogZeilenNummer"
+    logZeileStart="[$(fncYEAR1231 '1231') $(fncHHMMSS 'norm.mS3')]"
+    echo -en "$txtLogZeilenNummer $logZeileStart "
+}
+
+function fncAusgabeLogZeileStart {
+    logZeileStart="[$(fncYEAR1231 '1231') $(fncHHMMSS 'norm.mS3')]"
+    echo -en "$logZeileStart"
+}
+
+
 function fncKILLpid {
 #     if ( [[ "$1" == "" ]] )
 #     then
@@ -485,7 +503,18 @@ function fncKILLpid {
 }
 
 
-function fncCheckPaketInstalliertVar {
+function fncCheckLaufendeProzesse {
+    # -Check ob die erforderlichen Programme laufen:
+    # --$1 ist der Prozessname!!!
+    [[ -z "$1" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return
+
+    strProzessSucheErgebnis=(`ps -A -o comm= | grep -i $1`)
+    #[[ -z "$strProzessSucheErgebnis" ]] && echo -e "$(fncAusgabeLogZeileStart) EE FEHLER: $1 läuft nicht! [${FUNCNAME[0]}]" && exit 22;
+    [[ -z "$strProzessSucheErgebnis" ]] && fncECHOlxD "$(fncAusgabeLogZeileStart) EE FEHLER: $1 läuft nicht! [${FUNCNAME[0]}]" && exit 22;
+}
+
+
+function fncCheckInstalliertePakete {
     # -Überprüfen ob ein bestimmtes Paket installiert ist. Erfordert mindestens einen
     #  Paketnamen als Argument.
     # -Übergabe der Informationen mittels zweier Variablen:
@@ -499,6 +528,8 @@ function fncCheckPaketInstalliertVar {
     
     #[[ `apt list $1 --installed 2>/dev/null` == *$1* ]] && stsCheckPaketAusgabe="true" || stsCheckPaketAusgabe="false"
     tmpCheckPaket="`apt list $1 --installed 2>/dev/null`"
+    tmpCheckPaket="$tmpCheckPaket"" `ls /home/$nutzer/.cargo/bin`"
+    tmpCheckPaket="$tmpCheckPaket"" `ls /usr/bin`"
     stsCheckPaketExitcode="$?"
     [[ "$tmpCheckPaket" == *$1* ]] && stsCheckPaketAusgabe="true" || stsCheckPaketAusgabe="false"
     #stsCheckPaketExitcode="$?"
@@ -506,11 +537,12 @@ function fncCheckPaketInstalliertVar {
     [[ "$2" ]] && [[ "$2" == "stsCheckPaketAusgabe" ]] && echo -en "$stsCheckPaketAusgabe"
 }
 
-function fncTXTPaketInstalliert {
-    # -Die fncCheckPaketInstalliertVar mit dem stsCheckPaketAusgabe Flag starten und
+function fncAusgabeInstalliertePakete {
+    # -Die fncCheckInstalliertePakete mit dem stsCheckPaketAusgabe Flag starten und
     #  das Ergebnis direkt auswerten:
-    [[ `fncCheckPaketInstalliertVar "$1" "stsCheckPaketAusgabe"` == "true" ]] && txtCheckPaketAusgabe="$1 ist installiert." && echo -e "(ist installiert)"
-    [[ `fncCheckPaketInstalliertVar "$1" "stsCheckPaketAusgabe"` == "false" ]] && txtCheckPaketAusgabe="$1 ist nicht installiert." && echo -e "(ist NICHT installiert)"
+    #echo -e "--- DEBUG \$1: $1"
+    [[ `fncCheckInstalliertePakete "$1" "stsCheckPaketAusgabe"` == "true" ]] && txtCheckPaketAusgabe="$1 ist installiert." && echo -e "$(fncAusgabeLogZeileStart) II ERFOLGREICH: $1 ist installiert! [${FUNCNAME[0]}]"
+    [[ `fncCheckInstalliertePakete "$1" "stsCheckPaketAusgabe"` == "false" ]] && txtCheckPaketAusgabe="$1 ist nicht installiert." && echo -e "$(fncAusgabeLogZeileStart) EE FEHLER: $1 ist nicht installiert! [${FUNCNAME[0]}]"
 }
 
 
@@ -662,37 +694,6 @@ layoutAusgabeAnfang="|- "
 
 flagNowPlayingDJset="false"
 
-typeset -i intLogZeilenNummer="0"
-function fncLogZeileStartNummeriert {
-    intLogZeilenNummer=intLogZeilenNummer+7
-    txtLogZeilenNummer="$intLogZeilenNummer"
-    
-    #(( $intLogZeilenNummer < 10000 )) && txtLogZeilenNummer=" $txtLogZeilenNummer"
-    (( $intLogZeilenNummer < 1000 )) && txtLogZeilenNummer=" $txtLogZeilenNummer"
-    (( $intLogZeilenNummer < 100 )) && txtLogZeilenNummer=" $txtLogZeilenNummer"
-    (( $intLogZeilenNummer < 10 )) && txtLogZeilenNummer=" $txtLogZeilenNummer"
-    logZeileStart="[$(fncYEAR1231 '1231') $(fncHHMMSS 'norm.mS3')]"
-    echo -en "$txtLogZeilenNummer $logZeileStart "
-}
-
-function fncLogZeileStart {
-    logZeileStart="[$(fncYEAR1231 '1231') $(fncHHMMSS 'norm.mS3')]"
-    echo -en "$logZeileStart"
-}
-
-# fncLogZeileStart
-# fncLogZeileStart
-# fncLogZeileStart
-# intLogZeilenNummer="42"
-# fncLogZeileStart
-# fncLogZeileStart
-# fncLogZeileStart
-# intLogZeilenNummer="666"
-# fncLogZeileStart
-# fncLogZeileStart
-# fncLogZeileStart
-
-
 # ----- ENDE Standardparameter setzen -------------------------------------------------------------
 # -------------------------------------------------------------------------------------------------
 
@@ -704,34 +705,66 @@ function fncLogZeileStart {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
 # -------------------------------------------------------------------------------------------------
-# ----- START Server Status überprüfen ------------------------------------------------------------
-# -Erforderlich: icecast2, darkice
+# ----- START Benoetigte Pakete und Prozesse prüfen -----------------------------------------------
+# -Die benoetigten Prozesse werden minuetlich, also bei jedem Durchlauf des Cronjobs geprüft. Falls
+#  es Probleme mit einem der Prozesse gibt...
+# -Die Funktion sollte einmal beim Starten von icecast2/darkice ausgeführt werden und
+#  danach nur noch einmal stuendlich.
 
-#arrProzesseErforderlich=(icecast2 zwiebelsuppe darkice)
-arrProzesseErforderlich=(icecast2 darkice)
-
-function fncCheckProzesseErforderlich {
-    # -Check ob die erforderlichen Programme laufen:
-    # --$1 ist der Prozessname!!!
-    [[ -z "$1" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return
-    
-    strProzessSucheErgebnis=(`ps -A -o comm= | grep -i $1`)
-    [[ -z "$strProzessSucheErgebnis" ]] && echo -e "$(fncLogZeileStart) EE FEHLER: $1 läuft nicht! [${FUNCNAME[0]}]" && exit 22;
-}
-
-for i in "${arrProzesseErforderlich[@]}"
+# -Laufende Prozesse prüfen:
+#  icecast2, darkice
+arrBenoetigteProzesse=(icecast2 darkice)
+for i in "${arrBenoetigteProzesse[@]}"
 do
     #echo -e "--> Prozess prüfen: $i"
-    fncCheckProzesseErforderlich "$i"
+    fncCheckLaufendeProzesse "$i"
     #echo -e "--> Prozess läuft: $i"
 done
 
-# ----- ENDE Server Status überprüfen -------------------------------------------------------------
+function fncCheckStartPaketeProzesse {
+    # -Installierte Pakete prüfen:
+    #  icecast2 darkice apt songrec qdbus timeout
+    arrBenoetigtePakete=(icecast2 darkice apt songrec qdbus timeout)
+    for i in "${arrBenoetigtePakete[@]}"
+    do
+        #echo -e "--> Prozess prüfen: $i"
+        #fncCheckInstalliertePakete "$i"
+        fncAusgabeInstalliertePakete "$i"
+        #echo -e "--> Prozess läuft: $i"
+    done
+    # -Laufende Prozesse prüfen:
+    #  icecast2, darkice
+    arrBenoetigteProzesse=(icecast2 darkice)
+    for i in "${arrBenoetigteProzesse[@]}"
+    do
+        #echo -e "--> Prozess prüfen: $i"
+        fncCheckLaufendeProzesse "$i"
+        #echo -e "--> Prozess läuft: $i"
+    done
+}
+[[ $(date '+%M') == "00" ]] && fncCheckStartPaketeProzesse
+# ----- ENDE Benoetigte Pakete und Prozesse prüfen ------------------------------------------------
 # -------------------------------------------------------------------------------------------------
 
 
 
+
+
+
+
+#fncDEBUGstart
 
 
 
@@ -739,16 +772,64 @@ done
 
 # -------------------------------------------------------------------------------------------------
 # ----- START Action Argument auswerten -----------------------------------------------------------
-strAction="$1"
-# -case $strAction
-# --Start Stop
-# ---icecast2 darkice
-# --Titel Update
-# ---songrec
-# ---qdbus
-# -esac
+function fncCheckArgumente {
+
+    strAction="$1"
+    # -case $strAction
+    # --PLS-LOGS anzeigen
+    # --Start Stop
+    # ---icecast2 darkice
+    # --Titel Update
+    # ---songrec
+    # ---qdbus
+    # -esac
+
+    # -Die Argumente checken und verarbeiten:
+    for i in "$@"
+    do
+        case "$i" in
+            ("-pls")
+                # -Anzeigen: PLS
+                strAusgabeDatei="$dateiPlaylistAktuell"
+                echo -e "--- START - $datei PLS - $strAusgabeDatei"
+                cat $strAusgabeDatei
+                echo -e "---"
+                echo -e "--- ENDE - $datei PLS - $strAusgabeDatei"
+                exit 0;
+                ;;
+            ("-l")
+                # -Anzeigen: Logs
+                strAusgabeDatei="$dateiLOGS"
+                echo -e "--- START - $datei Logs - $strAusgabeDatei"
+                cat $strAusgabeDatei
+                echo -e "---"
+                echo -e "--- ENDE - $datei Logs - $strAusgabeDatei"
+                exit 0;
+                ;;
+        esac
+
+        if ( [[ "$i" == -*M ]] )
+        then
+            flagMORE="true"
+            #befehlAUSGABEmore="| more"
+            #befehlAUSGABEmore="echo -e $befehlAUSGABEmore"
+            #befehlAUSGABEmore="echo -e more"
+            #befehlAUSGABEmore="| $befehlAUSGABEmore"
+        fi
+    done
+}
+
+fncCheckArgumente
 # ----- ENDE Action Argument auswerten ------------------------------------------------------------
 # -------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
 
 
 
@@ -807,18 +888,18 @@ strAction="$1"
 # year: 2023
 # ##### ENDE Ausgabe ##########################################################
 
-# fncECHOlxL "$(fncLogZeileStart) --- Ausführung im Terminal:"
+# fncECHOlxL "$(fncAusgabeLogZeileStart) --- Ausführung im Terminal:"
 # fncECHOlxL "---- PATH: /usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games:/home/lx21/bin:/home/lx21/.cargo/bin"
 # fncECHOlxL "---- SHELL: /bin/sh"
 # fncECHOlxL "---- DISPLAY: :0"
 # fncECHOlxL "---- DBUS_SESSION_BUS_ADDRESS: unix:path=/run/user/1000/bus"
 # fncECHOlxL "---"
 
-# fncECHOlxL "$(fncLogZeileStart) II -Environment Variablen anzeigen:"
-# fncECHOlxL "$(fncLogZeileStart) II -PATH: $PATH"
-# fncECHOlxL "$(fncLogZeileStart) II -SHELL: $SHELL - DISPLAY: $DISPLAY"
-# fncECHOlxL "$(fncLogZeileStart) II -DBUS_SESSION_BUS_ADDRESS: $DBUS_SESSION_BUS_ADDRESS"
-# fncECHOlxL "$(fncLogZeileStart)"
+# fncECHOlxL "$(fncAusgabeLogZeileStart) II -Environment Variablen anzeigen:"
+# fncECHOlxL "$(fncAusgabeLogZeileStart) II -PATH: $PATH"
+# fncECHOlxL "$(fncAusgabeLogZeileStart) II -SHELL: $SHELL - DISPLAY: $DISPLAY"
+# fncECHOlxL "$(fncAusgabeLogZeileStart) II -DBUS_SESSION_BUS_ADDRESS: $DBUS_SESSION_BUS_ADDRESS"
+# fncECHOlxL "$(fncAusgabeLogZeileStart)"
 
 
 
@@ -834,13 +915,11 @@ DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/1000/bus"
 
 
 
-# fncECHOlxL "$(fncLogZeileStart) II -Environment Variablen mit source einbinden:"
-# fncECHOlxL "$(fncLogZeileStart) II -PATH: $PATH"
-# fncECHOlxL "$(fncLogZeileStart) II -SHELL: $SHELL - DISPLAY: $DISPLAY"
-# fncECHOlxL "$(fncLogZeileStart) II -DBUS_SESSION_BUS_ADDRESS: $DBUS_SESSION_BUS_ADDRESS"
-# fncECHOlxL "$(fncLogZeileStart)"
-
-
+# fncECHOlxL "$(fncAusgabeLogZeileStart) II -Environment Variablen mit source einbinden:"
+# fncECHOlxL "$(fncAusgabeLogZeileStart) II -PATH: $PATH"
+# fncECHOlxL "$(fncAusgabeLogZeileStart) II -SHELL: $SHELL - DISPLAY: $DISPLAY"
+# fncECHOlxL "$(fncAusgabeLogZeileStart) II -DBUS_SESSION_BUS_ADDRESS: $DBUS_SESSION_BUS_ADDRESS"
+# fncECHOlxL "$(fncAusgabeLogZeileStart)"
 
 
 
@@ -853,18 +932,22 @@ function fncUpdateMetadaten_Auslesen {
     timeout 55 songrec recognize > "$dateiLogsSongInfo" 2>&1
     #/usr/bin/timeout 50 /home/lx21/.cargo/bin/songrec recognize > "$dateiLogsSongInfo" 2>&1
     stsExitcodeTimeout="$?"
-    #[[ "$stsExitcodeTimeout" != "0" ]] && echo -e "$(fncLogZeileStart) EE -FEHLER: '$stsExitcodeTimeout'"\\n"$(fncLogZeileStart) EE 'songrec', '${FUNCNAME[0]}', '$datei'" > "$dateiLogsSongInfo" && echo -e "Fehler.Timeout" >> "$dateiLogsSongInfo"
+    #[[ "$stsExitcodeTimeout" != "0" ]] && echo -e "$(fncAusgabeLogZeileStart) EE -FEHLER: '$stsExitcodeTimeout'"\\n"$(fncAusgabeLogZeileStart) EE 'songrec', '${FUNCNAME[0]}', '$datei'" > "$dateiLogsSongInfo" && echo -e "Fehler.Timeout" >> "$dateiLogsSongInfo"
     
     # -Die temporäre $dateiLogsSongInfo neu erstellen und Fehlerinfo hinein schreiben, da Qdbus die
     #  Datei erwartet:
     [[ "$stsExitcodeTimeout" != "0" ]] && echo -e "--> FEHLER: '$stsExitcodeTimeout' - $datei.${FUNCNAME[0]}.songrec" >> "$dateiLogsSongInfo" && echo -e "Fehler.$stsExitcodeTimeout" >> "$dateiLogsSongInfo"
     
     # -Die komplette $dateiLogsSongInfo zur Fehlerdiagnose in die Logdatei übertragen:
-    [[ "$stsExitcodeTimeout" != "0" ]] && fncECHOlxL "$(fncLogZeileStart) EE +++++ Debug Info START +++++" && cat $dateiLogsSongInfo >> $dateiLOGS && fncECHOlxL "$(fncLogZeileStart) EE +++++ Debug Info ENDE +++++"
+    [[ "$stsExitcodeTimeout" != "0" ]] && fncECHOlxL "$(fncAusgabeLogZeileStart) EE +++++ Debug Info START +++++" && cat $dateiLogsSongInfo >> $dateiLOGS && fncECHOlxL "$(fncAusgabeLogZeileStart) EE +++++ Debug Info ENDE +++++"
     
-    qdbus org.mpris.MediaPlayer2.clementine /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.Metadata >> "$dateiLogsSongInfo" 2>&1
+    #qdbus org.mpris.MediaPlayer2.clementine /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.Metadata >> "$dateiLogsSongInfo" 2>&1
+    qdbus org.mpris.MediaPlayer2.strawberry /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.Metadata >> "$dateiLogsSongInfo" 2>&1
 }
 fncUpdateMetadaten_Auslesen
+
+
+
 
 #fncDEBUGstop
 
@@ -1002,7 +1085,7 @@ txtEncodedUpdateInfo="$strTxtEncoded"
 # --Beispiel:
 #   curl "http://u:pwd@i4u.spdns.de:8000/admin/metadata?mount=%2Fdu&mode=updinfo&song=BO%20of%20Music"
 
-#fncECHOlxL "$(fncLogZeileStart) --- Update-Info: $strMetaAktuellUpdateInfo"
+#fncECHOlxL "$(fncAusgabeLogZeileStart) --- Update-Info: $strMetaAktuellUpdateInfo"
 
 
 function fncUpdateMetadaten_Curl {
@@ -1036,9 +1119,9 @@ fncUpdateMetadaten_Curl
 # ##### START Daten Update: in Playliste, in Logdatei #########################
 
 # in Logdatei eintragen:
-#fncECHOlxP "$(fncLogZeileStart) - Update (komplett):\\t$strMetaAktuellUpdateInfo"
-#fncECHOlxL "$(fncLogZeileStart) - Status des Update: $flagUpdateMetadatenErfolgreich"
-#fncECHOlxL "$(fncLogZeileStart)"
+#fncECHOlxP "$(fncAusgabeLogZeileStart) - Update (komplett):\\t$strMetaAktuellUpdateInfo"
+#fncECHOlxL "$(fncAusgabeLogZeileStart) - Status des Update: $flagUpdateMetadatenErfolgreich"
+#fncECHOlxL "$(fncAusgabeLogZeileStart)"
 
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -1066,11 +1149,11 @@ done < $dateiCacheUpdate
 
 function fncUpdatePls {
     #flagUpdateMetadatenErforderlich="false"
-    fncECHOlxP "$(fncLogZeileStart) - Titel:\\t$strMetaAktuellTitle"
-    fncECHOlxP "$(fncLogZeileStart) - Artist:\\t$strMetaAktuellArtist"
-    fncECHOlxP "$(fncLogZeileStart) - DJ-Set:\\t$strMetaAktuellDJset"
-    fncECHOlxP "$(fncLogZeileStart) - Status des Update: $flagUpdateMetadatenErfolgreich"
-    fncECHOlxP "$(fncLogZeileStart)"
+    fncECHOlxP "$(fncAusgabeLogZeileStart) - Titel:\\t$strMetaAktuellTitle"
+    fncECHOlxP "$(fncAusgabeLogZeileStart) - Artist:\\t$strMetaAktuellArtist"
+    fncECHOlxP "$(fncAusgabeLogZeileStart) - DJ-Set:\\t$strMetaAktuellDJset"
+    fncECHOlxP "$(fncAusgabeLogZeileStart) - Status des Update: $flagUpdateMetadatenErfolgreich"
+    fncECHOlxP "$(fncAusgabeLogZeileStart)"
 }
 
 # -Daten eintragen in Playliste:
@@ -1081,9 +1164,9 @@ function fncUpdatePls {
 
 
 # -Daten eintragen in Logdatei:
-fncECHOlxL "$(fncLogZeileStart) -- Inhalt des Update: $strMetaAktuellUpdateInfo"
-fncECHOlxL "$(fncLogZeileStart) -- Status des Update: $flagUpdateMetadatenErfolgreich"
-fncECHOlxL "$(fncLogZeileStart)"
+fncECHOlxL "$(fncAusgabeLogZeileStart) -- Inhalt des Update: $strMetaAktuellUpdateInfo"
+fncECHOlxL "$(fncAusgabeLogZeileStart) -- Status des Update: $flagUpdateMetadatenErfolgreich"
+fncECHOlxL "$(fncAusgabeLogZeileStart)"
 
 
 # -Daten eintragen in Cache.Update:

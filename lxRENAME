@@ -1,16 +1,302 @@
 #!/bin/bash
-# lx-tools script von -lx-
+# skript von -lx-
+
+
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+# ----- ToDo:
+#
+# ----- DONE:
+#
+# ----- Bugs:
+#
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+# [[ -z "$1" ]] && echo -e "|- ${FUNCNAME[0]} FEHLER:"\\t"1. Argument nicht angegeben!" && return 11
+# [[ -z "$2" ]] && echo -e "|- ${FUNCNAME[0]} FEHLER:"\\t"2. Argument nicht angegeben!" && return 12
+# -------------------------------------------------------------------------------------------------
+# ----- START -------------------------------------------------------------------------------------
+# ----- ENDE --------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+
+
+
+# -------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+function fncDEBUGstart {
+    flagFNCdebug="true"
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    echo -e "--------------------------------------------------------------------------------"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - START Debug: $txtDEBUGtitel"
+    PS4='+ ${LINENO}:'`echo -en '\\t'`
+    set -x
+}
+
+function fncDEBUGstop {
+    # -Damit fncDEBUGstop nur ausgeführt wird, wenn vorher fncDEBUGstart aufgerufen wurde.
+    [ ! "$flagFNCdebug" ] && return
+    set +x
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - ENDE Debug: $txtDEBUGtitel"
+    echo -e "--------------------------------------------------------------------------------"
+}
+
+
+function fncClearX {
+    # -Da 'clear -x' einen Bug hat und deshalb den sichtbaren Teil der letzten
+    #  Befehle einfach löscht, werden soviele leere Zeilen ausgegeben, wie der
+    #  Bildschirm Zeilen hat.
+    # -Beim Aufruf von 'clear -x' löscht der Befehl dann diese leeren Zeilen
+    #  und die History wird nicht überschrieben.
+    typeset -i intAnzahlScreenZeilen=$(tput lines)
+    for ((iZeilen=1; iZeilen<$intAnzahlScreenZeilen; iZeilen++))
+    do
+        echo -e "$iZeilen"
+    done
+    clear -x
+}
+
+
+dateiVersionInfoNr=""
+function fncAUSLESENversion {
+    [ -z $datei ] && datei=${0//*\//}
+    [ -z $nutzer ] && nutzer=`ps --pid $$ -o user=` && [[ "$nutzer" == "root" ]] && nutzer=`id -un 1000`
+    strVERZEICHNISbin="/home/$nutzer/bin-bak/"
+    iaLSarray=(`ls -r $strVERZEICHNISbin$datei"_"* 2>/dev/null`)
+    iaLSarrayANZAHL=${#iaLSarray[@]}
+    dateiNameKomplett=${iaLSarray[0]}
+    dateiVersionKomplett=${iaLSarray[0]}
+
+    #  foo/bar/lxDOWNLOAD_2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+
+    # -Bis zum letzten Slash abschneiden:
+    dateiVersionKomplett=${dateiVersionKomplett//*\//}
+    #  lxDOWNLOAD_2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+
+    # -Dateiname bis Unterstrich abschneiden:
+    dateiVersionKomplett=${dateiVersionKomplett//`echo -e $datei`_/}
+    #  2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+
+    # -Unterstrich bis zum Ende abschneiden: dateiVersionInfoNr
+    dateiVersionInfoNr=${dateiVersionKomplett//_*/}
+    #  2.17.05-01-01
+
+    # -Bis zum Unterstrich abschneiden: dateiVersionKomplettTxt
+    dateiVersionKomplettTxt=${dateiVersionKomplett//$dateiVersionInfoNr\_/}
+    #  TODO_einbauen-dateiVersionNrTxt
+
+    # -Nur die Kategorie ausschneiden:
+    dateiVersionInfoKategorie=${dateiVersionKomplettTxt//_*/}
+    #  TODO
+
+    # -Nur den Infotext ausschneiden:
+    dateiVersionInfoTxt=${dateiVersionKomplettTxt//$dateiVersionInfoKategorie\_/}
+    #  einbauen-dateiVersionNrTxt
+
+    dateiVersionInfoNr="$dateiVersionInfoNr"
+    dateiVersionInfoKategorie="$dateiVersionInfoKategorie"
+    dateiVersionInfoTxt="$dateiVersionInfoTxt"
+
+}
+[[ ! $dateiVersionInfoNr ]] && fncAUSLESENversion
+[[ -z "$datei" ]] && echo -e "[FEHLER: Variable konnte nicht gelesen werden: 'datei']" && exit 22;
+
+
+
+function fncHHMMSS {
+    case "$1" in
+        ( nurZAHLEN )
+            echo -en `date '+%H%M%S'` ;;
+        ( nurSS )
+            echo -en `date '+%S'` ;;
+        ( nurSS.S )
+            echo -en `date '+%S.%N'` ;;
+        ( nurSS.mS3 )
+            HMSmS=`date '+%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:3}
+            echo -en $HMSxyz"."$mSxyz ;;
+        ( norm.mS2 )
+            HMSmS=`date '+%H:%M:%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:2}
+            echo -en $HMSxyz"."$mSxyz ;;
+        ( norm.mS3 )
+            HMSmS=`date '+%H:%M:%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:3}
+            echo -en $HMSxyz"."$mSxyz ;;
+        (*)
+            echo -en `date '+%H:%M:%S'` ;;
+    esac
+    #echo -en `date '+%H:%M:%S'`
+}
+
+function fncYEAR1231 {
+    case "$1" in
+        ( nurZAHLEN )
+            echo -en `date '+%Y%m%d'`
+            ;;
+        ( YEAR )
+            echo -en `date '+%Y'`
+            ;;
+        ( 12 )
+            echo -en `date '+%m'`
+            ;;
+        ( 31 )
+            echo -en `date '+%d'`
+            ;;
+        ( 1231 )
+            echo -en `date '+%m%d'`
+            ;;
+        (*)
+            echo -en `date '+%Y-%m-%d'`
+            ;;
+    esac
+}
+
+function fncANZAHLzeichen {
+    # -Die Anzahl der Zeichen in $1 ermitteln und mittels echo ausgeben!
+    [ ! "$1" ] && echo -e "[Kein Argument übergegeben: fncANZAHLzeichen]" && return 10
+    echo -e "${#1}"
+}
+
+
+txtPLATZHALTER=""
+function fncECHOplatzhalter {
+    # -Die Anzahl der Zeichen in $1 ermitteln und damit eine Linie als
+    #  PLATZHALTER erstellen!
+    # -ZeichenRandUhrzeit: "|- [09:31:37] "
+    # -Maximale Gesamtzeichenanzahl:
+    #  intZZmax=intLayoutMaxSpalten-intAnzahlZeichenRandUhrzeit
+    # -Am Ende werden $1 und $txtPLATZHALTER gemeinsam ausgegeben.
+    #  --------------------------------------------------------------------------------
+    txtPLATZHALTER=""
+    txtLEERZEICHEN=""
+    typeset -i intZZmax=0
+    typeset -i intZZplatzhalter=0
+    [ ! "$1" ] && intZZplatzhalter=$intZZmax
+
+    # -WICHTIG: Der Platzhalter wird mit der maximalen Länge erstellt und in die Logdatei
+    #  geschrieben. Bei der Ausgabe in den dynamischen Statuszeilen wird die Länge kontrolliert
+    #  und ggf korrigiert. Siehe intSTATUSzeichenMAX.
+    intZZmax=$intLayoutMaxSpalten
+
+    #echo -e "${#1}"
+    # -Damit zwischen $1 und $txtPLATZHALTER genau 1 Leerzeichen ist,
+    #  wird das letzte Zeichen von $1 entsprechend ausgeschnitten und
+    #  überprüft:
+    [ "$1" ] && [ -n "${1: -1}" ] && txtLEERZEICHEN=" "
+    [ "$1" ] && intZZplatzhalter=intZZmax-${#1}-${#txtLEERZEICHEN}
+    # -Den Platzhalter mittels Schleife zusammenbauen:
+    while ( [[ $intZZplatzhalter -gt 0 ]] )
+    do
+        txtPLATZHALTER=$txtPLATZHALTER"-"
+        intZZplatzhalter=intZZplatzhalter-1
+    done
+    # -$1 und $PLATZHALTER direkt ausgeben:
+    echo -e "$1""$txtLEERZEICHEN""$txtPLATZHALTER"
+}
+
+
+function fncECHOlx {
+    # -Erwartet einen String zum Ausgeben: $1
+    # --Ausgabe am Bildschirm
+    # --Ausgabe in die Logdatei
+    strSONDERZEICHENuvz=""
+    if ( [[ "$1" != "" ]] )
+    then
+        #[[ "$flagAUFRUFintern" == "true" ]] && strSONDERZEICHENuvz=" -!!!-"
+        echo -e "$1$strSONDERZEICHENuvz"
+        if ( [[ "$strg1" != -*l* ]] )
+        then
+            echo -e "$1$strSONDERZEICHENuvz" >> $dateiLOGS
+            echo -e "$1$strSONDERZEICHENuvz" >> $dateiLOGSarchiv
+        fi
+    fi
+    strSONDERZEICHENuvz=""
+}
+
+
+function fncECHOlxL {
+    # -Erwartet einen String zum Ausgeben: $1
+    # --Ausgabe in die Logdatei
+    if ( [[ "$1" != "" ]] )
+    then
+        #echo -e "$1"
+        echo -e "$1" >> $dateiLOGS
+        echo -e "$1" >> $dateiLOGSarchiv
+    fi
+}
+
+
+function fncECHOlxD {
+    # -Erwartet einen String zum Ausgeben: $1
+    # --Ausgabe am Bildschirm
+    if ( [[ "$1" != "" ]] )
+    then
+        echo -e "$1"
+        #echo -e "$1" >> $dateiLOGS
+    fi
+}
+
+
+
+
+# -------------------------------------------------------------------------------------------------------------
+# ----- START Format Parameter setzen ------------------------------------------------------------
+# -Display testen:
+if [[ `tty` != *dev* ]]
+then
+    # -Wenn KEIN Display vorhanden ist, handelt es sich um einen Cronjob!
+    # -da tput nur mit $TERM funktioniert werden die Format Variablen geleert:
+    fmtFETT=""
+    fmtINVERS=""
+    fmtUNTERSTRICHEN=""
+    fmtRESET=""
+
+    # -Start durch Cronjob oder Nutzer:
+    flagCronStart="true"
+    txtGestartetVon="Cronjob"
+else
+    fmtFETT=`tput bold`
+    fmtINVERS=`tput rev`
+    fmtUNTERSTRICHEN=`tput smul`
+    fmtRESET=`tput sgr0`
+
+    # -Start durch Cronjob oder Nutzer:
+    flagCronStart="false"
+    txtGestartetVon="Nutzer"
+fi
+# ----- ENDE Format Parameter setzen -------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------
+
+
+
+
+# -------------------------------------------------------------------------------------------------------------
+# ----- START Standard Parameter setzen ----------------------------------------------------------
+datei=${0//*\//}
+txtTITEL="Tool zum Umbenennen oder zum Entfernen von Sonderzeichen in Dateinamen! - START: $txtGestartetVon"
+benutzung="|- Benutzung: \\n|- '$datei [OPTIONEN] [PFAD]' \\n|- Ohne Pfadangabe wird das aktuelle Verzeichnis verwendet.\\n|-"
+zeitSTART=`date`
+
+dateiLOGS="/aa_daten/bak/log/$datei.aktuell.log"
+dateiLOGSarchiv="/aa_daten/bak/log/$datei.archiv.log"
+dateiLOGStmp="/aa_daten/bak/log/$datei.tmp.log"
+
+icoLIstart="++"
+
 
 pfad=$1
 flag_update=$2
 flag_aufruf_intern=$3
-zeit_start=`date`
-
-
-datei=${0//*\//}
-titel="Leer- und Sonderzeichen in Dateinamen entfernen!"
-benutzung="|- Benutzung: \\n|- '$datei [PFAD]' \\n|- Ohne Pfadangabe wird das aktuelle Verzeichnis verwendet.\\n|-"
-
+zeitSTART=`date`
 
 debug="Pfad: $pfad - I: $i - aufruf: $flag_aufruf_intern --- $0"
 #echo $debug
@@ -18,6 +304,173 @@ txtbox_debug1="--- DEBUG-Info: ----------------------------------------------\n"
 txtbox_debug2="------------------------------------------------------------------\n"
 txtbox_weiter="\nMöchten Sie das Skript weiter ausführen oder abbrechen?\n$0\n"
 #kdialog --title="DEBUG: $debug" --warningcontinuecancel="$txtbox_debug1$debug$txtbox_debug2$txtbox_weiter"
+# ----- ENDE Standard Parameter setzen -----------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+if ( [[ "$1" != -*q* ]] )
+then
+#     # wird (fast) immer angezeigt:
+#     echo -e "|--------------------------------------------------------------------------------"
+#     echo -e "|- $datei -| $txtTITEL"
+#     echo -e "|--------------------------------------------------------------------------------"
+#     echo -e "|- $zeitSTART"
+#     echo -e "|-"
+#     # version, GPL, autor...
+
+    # wird (fast) immer angezeigt:
+    echo -e "|--------------------------------------------------------------------------------"
+    echo -e "|- $datei -| $txtTITEL"
+    #echo -e "|- $datei -|"
+    #echo -e "|- $txtTITEL"
+    #echo -e "|- $dateiVersionInfoNr ($dateiVersionInfoKategorie: $dateiVersionInfoTxt) -|"
+    echo -e "|- $dateiVersionInfoNr ($dateiVersionInfoKategorie: $dateiVersionInfoTxt)"
+    echo -e "|--------------------------------------------------------------------------------"
+    echo -e "|- "`date`
+    echo -e "|-"
+    # version, GPL, autor...
+
+    if ( [[ "$1" == -*h* ]] )
+    then
+        echo -e $benutzung
+        echo -e "|- Optionen:"
+        echo -e "|- -h     Diesen Hilfetext anzeigen. Andere Optionen werden ignoriert."
+        echo -e "|- -ext   Die Extension von Dateien ändern. Pfad, Alte und Neue Extension müssen angegeben werden."
+        echo -e "|-        '$datei -ext /foo/bar txt bak'"
+        echo -e "|- -q     Quiet Modus: Nicht more zur Ausgabe nutzen und keine Kopfzeilen anzeigen."
+        echo -e "|-        HINWEIS: Fehlermeldungen werden immer angezeigt."
+        echo -e "|-"
+        echo -e "|- Die Ausgabe erfolgt durch das Programm more. Bedienung:"
+        echo -e "|- 'RETURN'\tzeilenweise weiterscrollen"
+        echo -e "|- 'd'\t\tden halben Screen weiterscrollen"
+        echo -e "|- 'SPACE'\tkompletten Screen weiterscrollen"
+        echo -e "|- 'h'\t\tOptionen anzeigen"
+        echo -e "|- 'q'\t\tbeendet Ausgabe"
+        echo -e "|-"
+        echo -e "|- Befehlsvarianten:"
+        echo -e "|- -BEFEHL (ohne Argumente):"
+        echo -e "|-"
+        echo -e "|- -BEFEHL (1 Argument):"
+        echo -e "|-"
+        echo -e "|- -BEFEHL (2 Argumente):"
+        echo -e "|-"
+        echo -e "|- -BEFEHL (3 Argumente):"
+        echo -e "|-"
+        exit 0;
+    fi
+
+    echo -e $benutzung
+    #echo -e $benutzung2
+    #echo -e "|- Ohne Angabe einer Logdatei wird automatisch syslog benutzt! Siehe '$datei -h'."
+    #echo -e "|-"
+    str1="$1"
+    str2="$2"
+    str3="$3"
+else
+    # -q wurde gesetzt!
+    # -Vvariablen entsprechend neu zuweisen:
+    str1="$1"
+    str2="$2"
+    str3="$3"
+    # -Wenn NUR -q gesetzt ist, muss verhindert werden, dass dieser String als
+    #  Suchstring genutzt wird:
+    if ( [[ "$str1" == "-q" ]] )
+    then
+        str1="$2"
+        str2="$3"
+        str3="$4"
+    fi
+fi
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ---------------------------------------------------------------------------------------
+# --- START SONDERFALL Extension Aendern ------------------------------------------------
+function fncExtensionAendern {
+  [[ -z "$2" ]] && echo -e "|- ${FUNCNAME[0]} FEHLER:"\\t"2. Argument nicht angegeben!" && return 12
+  [[ -z "$3" ]] && echo -e "|- ${FUNCNAME[0]} FEHLER:"\\t"3. Argument nicht angegeben!" && return 12
+  [[ -z "$4" ]] && echo -e "|- ${FUNCNAME[0]} FEHLER:"\\t"4. Argument nicht angegeben!" && return 12
+
+  pfad="$2"
+  strExtensionAlt="$3"
+  strExtensionNeu="$4"
+
+  [[ "$pfad" != */ ]] && pfad="$pfad""/"
+
+  for ia in $(ls --group-directories-first $pfad)
+    do
+    nix=0
+    #echo -e "-----------------------------------"
+    #echo -e "-flag_aufruf_intern: $flag_aufruf_intern"
+    #echo -e "-ia: $ia"
+    #echo -e "-pfad: $pfad"
+
+    cp -v $pfad$ia $pfad$ia".$strExtensionNeu"
+
+    if ( [[ -d "$ia" ]] )
+    then
+      continue
+    fi
+
+    if ( [[ -f "$ia" ]] )
+    then
+      echo -e "--- $strExtensionAlt --> $strExtensionNeu"
+      # -Alte Extension kontrollieren und dann durch Neue ersetzen:
+      if ( [[ "$ia" == *."$strExtensionAlt" ]] )
+      then
+        echo -e "--- $strExtensionAlt --- $ia"
+      fi
+    fi
+
+
+    #echo -e "...done - suchpfad: $suchpfad"
+    # ende der ia schleife
+  done
+}
+
+
+#if ( [[ "$1" == -*h* ]] || [[ "$1" != -*q* ]] )
+if ( [[ "$1" == "-ext" ]] )
+then
+  fncExtensionAendern $@
+  exit 0;
+fi
+# --- ENDE SONDERFALL Extension Aendern -------------------------------------------------
+# ---------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -26,10 +479,6 @@ txtbox_weiter="\nMöchten Sie das Skript weiter ausführen oder abbrechen?\n$0\n
 function fncRenameDirectory {
     arrVERZEICHNISSE=(`find "$pfad" -type d`)
 }
-
-
-
-
 
 
 
@@ -238,7 +687,7 @@ echo -e "|- $datei - $0"
 
 if ( [ "$flag_aufruf_intern" != "true" ] )
  then
- echo -e "|- Gestartet: $zeit_start"
+ echo -e "|- Gestartet: $zeitSTART"
  echo -e "|- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::"
  echo -e "|- ::::::::::::::::::: rename script von -lx- ::::::::::::::::::::"
  echo -e "|- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::"
@@ -272,11 +721,11 @@ if ( [ "$flag_aufruf_intern" != "true" ] && [ -f "$pfad" ] )
   
   RenameFILEandVARIABLE
     
-  zeit_ende=`date`
+  zeitENDE=`date`
   kdialog --title="INFO" --msgbox="Umbenennen der Datei erfolgreich!\n\n\nAlt: $pfad\n\nNeu: $i\n\n\n\n-ende:eine-datei-"
   echo -e "::: ENDE: eine-datei"
   echo -e "::: Check Datei      : $suchpfad"
-  echo -e "::: Check beendet    : $zeit_ende"
+  echo -e "::: Check beendet    : $zeitENDE"
   exit 0;
 fi
 
@@ -371,7 +820,7 @@ for ia in $(ls --group-directories-first $pfad)
     #flag_aufruf_intern=false
   fi
 
-    zeit_ende=`date`
+    zeitENDE=`date`
     if (($flag_stop==1))
     then
         #echo -e "...done - suchpfad: $suchpfad"
@@ -387,7 +836,7 @@ for ia in $(ls --group-directories-first $pfad)
             fi
         echo -e "::: ENDE: flag_stop"
         echo -e "::: Check Verzeichnis: $suchpfad"
-        echo -e "::: Check beendet    : $zeit_ende"
+        echo -e "::: Check beendet    : $zeitENDE"
         fi
         exit 0;
     fi
@@ -402,25 +851,25 @@ done
 
 
 
-zeit_ende=`date`
+zeitENDE=`date`
 if ( [ "$flag_update" == true ] && [ "$flag_aufruf_intern" != true ] )
  then
  #echo -e "...MSGBOX update"
  kdialog --title="INFO" --msgbox="Update erfolgreich!$txtbox_pfad\n\n\n-ende:update_02-"
  echo -e "::: ENDE: update"
  echo -e "::: Check Verzeichnis: $suchpfad"
- echo -e "::: Check beendet    : $zeit_ende"
+ echo -e "::: Check beendet    : $zeitENDE"
  exit 0;
 fi
 
-zeit_ende=`date`
+zeitENDE=`date`
 if ( [ "$flag_aufruf_intern" != true ] )
  then
  #echo -e "...MSGBOX normal"
  kdialog --title="INFO" --msgbox="Umbenennen der Dateien erfolgreich!$txtbox_pfad\n\n\n-ende:normal-"
  echo -e "::: ENDE: normal"
  echo -e "::: Check Verzeichnis: $suchpfad"
- echo -e "::: Check beendet    : $zeit_ende"
+ echo -e "::: Check beendet    : $zeitENDE"
 fi
 
 
